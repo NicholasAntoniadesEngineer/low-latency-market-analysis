@@ -15,6 +15,68 @@ this project implements a high-performance market data processing system using t
 - websocket-based market data ingestion
 - custom linux drivers for fpga communication
 
+## project structure
+
+```
+low-latency-market-analysis/
+├── hps/
+│   ├── core0/
+│   │   ├── src/
+│   │   │   ├── market_data_handler/
+│   │   │   └── network_interface/
+│   │   └── scripts/
+│   │       ├── build.sh
+│   │       └── run.sh
+│   ├── core1/
+│   │   ├── src/
+│   │   │   ├── strategy_engine/
+│   │   │   └── order_management/
+│   │   └── scripts/
+│   │       ├── build.sh
+│   │       └── run.sh
+│   └── common/
+│       ├── include/
+│       └── lib/
+├── fpga/
+│   ├── src/
+│   │   ├── hdl/
+│   │   │   ├── market_data_parser/
+│   │   │   ├── technical_indicators/
+│   │   │   └── order_book/
+│   │   └── constraints/
+│   └── scripts/
+│       ├── build.sh
+│       └── program.sh
+└── docs/
+    ├── hps/
+    └── fpga/
+```
+
+### directory structure explanation
+
+- `hps/`: hardware processing system (arm cores) code
+  - `core0/`: primary core handling market data ingestion
+  - `core1/`: secondary core for strategy execution
+  - `common/`: shared libraries and headers
+- `fpga/`: fpga fabric implementation
+  - `src/hdl/`: verilog/vhdl source files
+  - `src/constraints/`: timing and pin constraints
+- `docs/`: documentation for both hps and fpga components
+
+### build system
+
+each component has its own build and execution scripts:
+
+#### hps build system
+- `core0/scripts/build.sh`: compiles market data handling components
+- `core0/scripts/run.sh`: deploys and runs core0 processes
+- `core1/scripts/build.sh`: compiles strategy execution components
+- `core1/scripts/run.sh`: deploys and runs core1 processes
+
+#### fpga build system
+- `fpga/scripts/build.sh`: synthesizes and implements fpga design
+- `fpga/scripts/program.sh`: programs the fpga with generated bitstream
+
 ## hardware requirements
 
 - terasic de10 nano development board
