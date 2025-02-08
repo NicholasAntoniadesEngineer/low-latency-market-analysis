@@ -14,6 +14,7 @@ this project implements a high-performance market data processing system using t
 - integration with alpaca markets api
 - websocket-based market data ingestion
 - custom linux drivers for fpga communication
+- integration of the RFS2 board for wireless communication and networking
 
 ## project structure
 
@@ -123,6 +124,10 @@ each component has its own build and execution scripts:
 - strategy implementation
 - risk management
 - performance optimization
+
+### phase 4: Integrate the RFS2 board
+- implement wireless communication
+- add networking capabilities for remote monitoring and control
 
 ## testing
 
