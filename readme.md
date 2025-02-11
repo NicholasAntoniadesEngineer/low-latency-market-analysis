@@ -139,7 +139,6 @@ target performance metrics:
 ### OEM documentation
 - [De10-nano downloads](https://download.terasic.com/downloads/cd-rom/de10-nano/ ) 
 - [DE10-Nano System Builder](https://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=en-us&CategoryNo=167&No=1004)
-- [Alpaca Markets API](https://alpaca.markets/learn/api-documentation/)
 - [Terasic DE10-Nano](https://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=en-us&CategoryNo=167&No=1004)
 
 ### course material
