@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
-<instance entity-name="altera_pll" version="14.1" >
+<instance entity-name="altera_pll" version="16.0" >
 <generic name="debug_print_output" value="false" />
 <generic name="debug_use_rbc_taf_method" value="false" />
 <generic name="device_family" value="Cyclone V" />
 <generic name="device" value="Unknown" />
-<generic name="gui_device_speed_grade" value="1" />
+<generic name="gui_device_speed_grade" value="2" />
 <generic name="gui_pll_mode" value="Integer-N PLL" />
 <generic name="gui_reference_clock_frequency" value="50.0" />
 <generic name="gui_channel_spacing" value="0.0" />
@@ -186,7 +186,6 @@
 <generic name="gui_en_dps_ports" value="false" />
 <generic name="gui_en_phout_ports" value="false" />
 <generic name="gui_phout_division" value="1" />
-<generic name="gui_en_lvds_ports" value="false" />
 <generic name="gui_mif_generate" value="false" />
 <generic name="gui_enable_mif_dps" value="false" />
 <generic name="gui_dps_cntr" value="C0" />

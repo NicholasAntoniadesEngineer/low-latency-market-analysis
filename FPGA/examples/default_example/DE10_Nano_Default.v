@@ -77,7 +77,7 @@ always @(posedge FPGA_CLK1_50 or negedge KEY[0]) begin
         clk_divider <= clk_divider + 1;
 end
 
-assign slow_clk = clk_divider[23]; // Adjust bit selection for desired blinking rate
+assign slow_clk = clk_divider[16]; // Adjust bit selection for desired blinking rate
 
 always @(posedge slow_clk or negedge KEY[0]) begin
     if (!KEY[0])
