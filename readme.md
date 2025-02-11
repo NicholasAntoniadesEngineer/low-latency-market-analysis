@@ -134,3 +134,20 @@ target performance metrics:
 - market data processing latency: <1μs
 - order execution latency: <10μs
 - strategy calculation time: <5μs
+
+
+## references
+
+### documentation
+- [DE10-Nano System Builder](https://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=en-us&CategoryNo=167&No=1004)
+- [Alpaca Markets API](https://alpaca.markets/learn/api-documentation/)
+- [Terasic DE10-Nano](https://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=en-us&CategoryNo=167&No=1004)
+- [ECE5760 - FPGA Design](https://people.ece.cornell.edu/land/courses/ece5760/)
+- [ECE5760 Lab 1](https://bpb-us-w2.wpmucdn.com/sites.coecis.cornell.edu/dist/4/81/files/2017/03/ece5760_lab1-18xgakl.pdf)
+
+### youtube
+- [Bruce Land - Cornell University](https://www.youtube.com/watch?v=fQAicY9a3DM&list=PLKcjQ_UFkrd7UcOVMm39A6VdMbWWq-e_c)
+- [Hunter Adams - Cornell University](https://www.youtube.com/watch?v=F9IYUOXtlPo)
+
+
+
