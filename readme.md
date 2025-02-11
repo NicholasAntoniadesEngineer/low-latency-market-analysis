@@ -77,9 +77,12 @@ each component has its own build and execution scripts:
 ## software requirements
 
 - quartus prime lite (free version)
+- DE10-Nano System Builder  
 - linux os (custom built or provided image)
-- python 3.8+
 - alpaca markets api account (free paper trading account)
+
+
+<img src="images/FPGA_dev_flow.png" alt="FPGA Development Flow" style="max-width:800px;">
 
 ## system architecture
 
