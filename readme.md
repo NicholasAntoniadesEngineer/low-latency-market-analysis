@@ -4,7 +4,7 @@ a low-latency market data processing system using the de10 nano (cyclone v soc) 
 
 ## project overview
 
-this project implements a high-performance market data processing system using the de10 nano's dual-core arm cortex-a9 processor and cyclone v fpga. the system is designed to process market data streams, detect trading opportunities, and execute trades with minimal latency.
+This project implements a high-performance market data processing system using Altera's Cyclone V FPGA. The system is designed to process market data streams, detect trading opportunities, and execute trades with minimal latency.
 
 ### key features
 
