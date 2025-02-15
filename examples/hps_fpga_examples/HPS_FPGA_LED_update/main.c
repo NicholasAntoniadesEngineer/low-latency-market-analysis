@@ -10,6 +10,7 @@ static led_controller_t led_ctrl;
 static volatile sig_atomic_t running = 1;
 
 void signal_handler(int signum) {
+    (void)signum;  // Explicitly mark as unused
     running = 0;
     led_controller_stop(&led_ctrl);
 }
@@ -24,6 +25,8 @@ void setup_signal_handlers(void) {
 }
 
 int main(int argc, char *argv[]) {
+    (void)argc;  // Explicitly mark as unused
+    (void)argv;  // Explicitly mark as unused
     fpga_uio_dev_t uio_dev;
     int ret = 0;
 
