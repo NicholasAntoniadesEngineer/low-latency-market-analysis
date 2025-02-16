@@ -146,6 +146,5 @@ For a streamlined, production-focused build:
 ## Resources
 
 - [DE10-Nano Documentation](https://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=English&CategoryNo=165&No=1046)
-- [Cyclone V SoC Documentation](https://www.intel.com/content/www/us/en/programmable/products/soc/overview.html)
 - [Linux Kernel Documentation](https://www.kernel.org/doc/html/latest/)
 - [Yocto Project Documentation](https://docs.yoctoproject.org/)
