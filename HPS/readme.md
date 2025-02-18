@@ -4,7 +4,10 @@ This guide outlines the workflow for developing and deploying custom Linux image
 
 ## Development Options
 
-### 1. Full Custom Debian Build
+### 1. Off the shelf linux distro
+https://github.com/zangman/de10-nano/releases
+
+### 2. Full Custom Debian Build
 For a full-featured development environment with maximum flexibility:
 
 #### Prerequisites
@@ -47,7 +50,7 @@ For a full-featured development environment with maximum flexibility:
    - Build against kernel headers
    - Install to rootfs
 
-### 2. Yocto-Based Build
+### 3. Yocto-Based Build
 For a streamlined, production-focused build:
 
 1. **Setup Yocto Environment**
