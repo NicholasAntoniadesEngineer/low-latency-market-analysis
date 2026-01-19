@@ -45,15 +45,16 @@ modelsim.ini
 hps_isw_handoff/
 
 # HPS Software Build Artifacts
-hps/preloader/
-hps/spl_bsp/
-hps/*/build/
-hps/*/*.o
-hps/*/*.d
-hps/*/*.elf
-hps/*/*.bin
-hps/*/*.img
-hps/*/*.log
+HPS/preloader/
+HPS/spl_bsp/
+HPS/*/build/
+HPS/*/*/build/
+HPS/*/*/*.o
+HPS/*/*/*.d
+HPS/*/*/*.elf
+HPS/*/*/*.bin
+HPS/*/*/*.img
+HPS/*/*/*.log
 *.dep
 
 # Device Tree Files (generated)

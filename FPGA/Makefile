@@ -195,7 +195,7 @@ endif
 HDL_DIR := hdl
 QUARTUS_DIR := quartus
 QSYS_DIR := $(QUARTUS_DIR)/qsys
-BUILD_DIR := build
+BUILD_DIR := ../build
 GENERATED_DIR := generated
 DOCS_DIR := docs
 
@@ -732,27 +732,27 @@ $(QUARTUS_TCL_PIN_ASSIGNMENTS_APPLY_TARGETS): quartus_apply_tcl-%: %
 	@# File path $< is relative to FPGA/ directory (where Makefile runs)
 	@# QUARTUS_DIR is quartus/ (relative to FPGA/)
 	@# From quartus/, to reach files in FPGA/:
-	@#   - generated/ files: ../../generated/...
+	@#   - generated/ files: ../generated/... (one level up to FPGA/, then into generated/)
 	@#   - qsys/ files: qsys/... (already under quartus/)
 	@TCL_FILE=""; \
 	if [ -f "$<" ]; then \
 		if echo "$<" | grep -q "^generated/"; then \
-			TCL_FILE="../../$<"; \
+			TCL_FILE="../$<"; \
 		elif echo "$<" | grep -q "^quartus/qsys/"; then \
 			TCL_FILE="$$(echo "$<" | sed 's|^quartus/||')"; \
 		elif echo "$<" | grep -q "^qsys/"; then \
 			TCL_FILE="$<"; \
 		else \
-			TCL_FILE="../../$<"; \
+			TCL_FILE="../$<"; \
 		fi; \
 		cd $(QUARTUS_DIR) && $(QUARTUS_STA_CMD) -t "$$TCL_FILE" $(notdir $(QUARTUS_QPF)); \
 	elif [ -f "$(QUARTUS_DIR)/$<" ]; then \
 		cd $(QUARTUS_DIR) && $(QUARTUS_STA_CMD) -t $< $(notdir $(QUARTUS_QPF)); \
-	elif [ -f "../../$<" ]; then \
-		cd $(QUARTUS_DIR) && $(QUARTUS_STA_CMD) -t ../../$< $(notdir $(QUARTUS_QPF)); \
+	elif [ -f "../$<" ]; then \
+		cd $(QUARTUS_DIR) && $(QUARTUS_STA_CMD) -t ../$< $(notdir $(QUARTUS_QPF)); \
 	else \
 		$(ECHO) "Error: Could not find TCL file: $<"; \
-		$(ECHO) "  (Searched: $<, $(QUARTUS_DIR)/$<, ../../$<)"; \
+		$(ECHO) "  (Searched: $<, $(QUARTUS_DIR)/$<, ../$<)"; \
 		exit 1; \
 	fi
 
