@@ -250,35 +250,66 @@ linux-image:
 	@$(MAKE) sd-image
 	@echo -e "$(GREEN)Complete Linux image built$(NC)"
 
-sd-image: fpga kernel rootfs
+sd-image: fpga
+	@if [ ! -f "$(KERNEL_DIR)/build/arch/arm/boot/zImage" ]; then \
+		echo -e "$(YELLOW)Kernel not found, building...$(NC)"; \
+		$(MAKE) kernel; \
+	else \
+		echo -e "$(GREEN)✓ Kernel already built$(NC)"; \
+	fi; \
+	if [ ! -f "$(ROOTFS_DIR)/build/rootfs.tar.gz" ]; then \
+		echo -e "$(YELLOW)Rootfs not found, building...$(NC)"; \
+		$(MAKE) rootfs; \
+	else \
+		echo -e "$(GREEN)✓ Rootfs already built$(NC)"; \
+	fi
 	@echo -e "$(GREEN)===========================================$(NC)"
 	@echo -e "$(GREEN)SD Card Image Creation$(NC)"
 	@echo -e "$(GREEN)===========================================$(NC)"
 	@echo -e "$(YELLOW)Creating SD card image...$(NC)"
-	@if [ -f "$(SCRIPTS_DIR)/create_sd_image.sh" ]; then \
-		if [ "$(shell id -u)" -eq 0 ]; then \
-			set -e; \
-			tmp_script="$(SCRIPTS_DIR)/.create_sd_image.normalized.$$$$"; \
-			trap 'rm -f "$$tmp_script"' EXIT; \
-			tr -d '\r' < "$(SCRIPTS_DIR)/create_sd_image.sh" > "$$tmp_script"; \
-			chmod +x "$$tmp_script"; \
-			bash "$$tmp_script"; \
+	@echo -e "$(YELLOW)Normalizing scripts for WSL compatibility...$(NC)"
+	@bash -c '\
+		set -e; \
+		wrapper_script="create_sd_image_wrapper.sh"; \
+		main_script="$(SCRIPTS_DIR)/create_sd_image.sh"; \
+		tmp_wrapper=".create_sd_image_wrapper.normalized.$$$$"; \
+		tmp_main="$(SCRIPTS_DIR)/.create_sd_image.normalized.$$$$"; \
+		trap "rm -f \"$$tmp_wrapper\" \"$$tmp_main\"" EXIT; \
+		\
+		if [ ! -f "$$wrapper_script" ]; then \
+			echo "ERROR: SD image wrapper script not found: $$wrapper_script"; \
+			exit 1; \
+		fi; \
+		if [ ! -f "$$main_script" ]; then \
+			echo "ERROR: Main SD image script not found: $$main_script"; \
+			exit 1; \
+		fi; \
+		\
+		echo "Normalizing $$wrapper_script -> $$tmp_wrapper"; \
+		tr -d "\\r" < "$$wrapper_script" > "$$tmp_wrapper"; \
+		chmod +x "$$tmp_wrapper"; \
+		\
+		echo "Normalizing $$main_script -> $$tmp_main"; \
+		tr -d "\\r" < "$$main_script" > "$$tmp_main"; \
+		chmod +x "$$tmp_main"; \
+		\
+		export NORMALIZED_MAIN_SCRIPT="$$tmp_main"; \
+		\
+		echo ""; \
+		echo "Scripts normalized successfully"; \
+		echo ""; \
+		\
+		if [ "$$(id -u)" -eq 0 ]; then \
+			echo "Running as root..."; \
+			bash "$$tmp_wrapper"; \
 		else \
 			echo "Image creation requires root access"; \
 			echo "Run with: sudo make sd-image"; \
-			echo -e "$(YELLOW)If it looks stuck, sudo is waiting for your password (input is hidden).$(NC)"; \
-			sudo -v; \
-			set -e; \
-			tmp_script="$(SCRIPTS_DIR)/.create_sd_image.normalized.$$$$"; \
-			trap 'rm -f "$$tmp_script"' EXIT; \
-			tr -d '\r' < "$(SCRIPTS_DIR)/create_sd_image.sh" > "$$tmp_script"; \
-			chmod +x "$$tmp_script"; \
-			sudo bash "$$tmp_script"; \
+			echo -e "$(YELLOW)NOTE: If it looks stuck, sudo is waiting for your password (input is hidden).$(NC)"; \
+			echo ""; \
+			sudo -v && sudo bash "$$tmp_wrapper"; \
 		fi \
-	else \
-		echo "ERROR: SD image script not found: $(SCRIPTS_DIR)/create_sd_image.sh"; \
-		exit 1; \
-	fi
+	'
 
 clean:
 	@echo -e "$(YELLOW)Cleaning Linux image build artifacts...$(NC)"
