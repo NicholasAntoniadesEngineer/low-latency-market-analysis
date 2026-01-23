@@ -21,9 +21,9 @@ GREEN := \033[0;32m
 YELLOW := \033[1;33m
 NC := \033[0m
 
-.PHONY: all help clean calculator_test led_examples
+.PHONY: all help clean calculator_test led_examples boot_led
 
-all: calculator_test
+all: calculator_test boot_led
 	@echo -e "$(GREEN)===========================================$(NC)"
 	@echo -e "$(GREEN)Applications build complete$(NC)"
 	@echo -e "$(GREEN)===========================================$(NC)"
@@ -35,6 +35,7 @@ help:
 	@echo "Targets:"
 	@echo "  all              - Build all applications (default)"
 	@echo "  calculator_test  - Build calculator test suite"
+	@echo "  boot_led         - Build boot LED indicator"
 	@echo "  led_examples     - Build LED control examples"
 	@echo "  clean            - Remove all build artifacts"
 	@echo "  help             - Show this help message"
@@ -67,10 +68,22 @@ led_examples:
 		$(MAKE) -C led_examples/advanced CROSS_COMPILE=$(CROSS_COMPILE) >/dev/null 2>&1 || true; \
 	fi
 
+boot_led:
+	@echo -e "$(YELLOW)Building boot LED indicator...$(NC)"
+	@if [ -f "boot_led/Makefile" ]; then \
+		$(MAKE) -C boot_led CROSS_COMPILE=$(CROSS_COMPILE); \
+	else \
+		echo "ERROR: boot_led/Makefile not found"; \
+		exit 1; \
+	fi
+
 clean:
 	@echo -e "$(YELLOW)Cleaning application build artifacts...$(NC)"
 	@if [ -f "calculator_test/Makefile" ]; then \
 		$(MAKE) -C calculator_test clean || true; \
+	fi
+	@if [ -f "boot_led/Makefile" ]; then \
+		$(MAKE) -C boot_led clean || true; \
 	fi
 	@if [ -f "led_examples/basic/Makefile" ]; then \
 		$(MAKE) -C led_examples/basic clean || true; \
