@@ -1,0 +1,23 @@
+[Unit]
+Description=Boot LED Indicator for DE10-Nano
+Documentation=https://github.com/low-latency-market-analysis
+After=local-fs.target
+Before=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/local/bin/boot_led --daemon --pattern 0
+ExecStop=/bin/kill -TERM $MAINPID
+Restart=on-failure
+RestartSec=5
+
+# Run as root for /dev/mem access
+User=root
+
+# Resource limits
+Nice=-10
+IOSchedulingClass=realtime
+IOSchedulingPriority=0
+
+[Install]
+WantedBy=multi-user.target

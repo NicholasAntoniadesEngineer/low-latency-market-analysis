@@ -799,6 +799,56 @@ run_post_install_scripts() {
     echo -e "${GREEN}Post-install scripts completed${NC}"
 }
 
+install_hps_applications() {
+    print_header "Installing HPS Applications"
+    
+    # Find the applications directory
+    local HPS_APPS_DIR
+    HPS_APPS_DIR="$(cd "$SCRIPT_DIR/../../applications" 2>/dev/null && pwd)" || true
+    
+    if [ ! -d "$HPS_APPS_DIR" ]; then
+        echo -e "${YELLOW}Applications directory not found, skipping...${NC}"
+        return
+    fi
+    
+    # Install boot_led if available
+    local BOOT_LED_DIR="$HPS_APPS_DIR/boot_led"
+    if [ -d "$BOOT_LED_DIR" ]; then
+        print_step "Installing boot LED indicator..."
+        
+        # Build boot_led if not already built
+        if [ ! -f "$BOOT_LED_DIR/boot_led" ]; then
+            echo "  Building boot_led..."
+            if ! make -C "$BOOT_LED_DIR" CROSS_COMPILE=arm-linux-gnueabihf- >/dev/null 2>&1; then
+                echo -e "${YELLOW}  Warning: Failed to build boot_led, skipping${NC}"
+            fi
+        fi
+        
+        # Install binary
+        if [ -f "$BOOT_LED_DIR/boot_led" ]; then
+            mkdir -p "$ROOTFS_DIR/usr/local/bin"
+            cp "$BOOT_LED_DIR/boot_led" "$ROOTFS_DIR/usr/local/bin/"
+            chmod 755 "$ROOTFS_DIR/usr/local/bin/boot_led"
+            echo "  Installed boot_led to /usr/local/bin/"
+            
+            # Install systemd service
+            if [ -f "$BOOT_LED_DIR/boot-led.service" ]; then
+                mkdir -p "$ROOTFS_DIR/etc/systemd/system"
+                cp "$BOOT_LED_DIR/boot-led.service" "$ROOTFS_DIR/etc/systemd/system/"
+                chmod 644 "$ROOTFS_DIR/etc/systemd/system/boot-led.service"
+                
+                # Enable service on boot
+                mkdir -p "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants"
+                ln -sf /etc/systemd/system/boot-led.service \
+                       "$ROOTFS_DIR/etc/systemd/system/multi-user.target.wants/boot-led.service"
+                echo "  Enabled boot-led.service on boot"
+            fi
+        fi
+    fi
+    
+    echo -e "${GREEN}HPS applications installed${NC}"
+}
+
 create_rootfs_tarball() {
     print_header "Creating Rootfs Tarball"
     
@@ -841,6 +891,7 @@ main() {
     configure_network
     configure_ssh
     run_post_install_scripts
+    install_hps_applications
     create_rootfs_tarball
     
     print_header "Root Filesystem Build Complete"
