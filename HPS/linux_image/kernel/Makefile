@@ -256,7 +256,8 @@ kernel-build: kernel-config kernel-integrate-driver
 	fi
 	@cd $(KERNEL_DIR) && \
 	make O=$(abspath $(KERNEL_BUILD_DIR)) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) \
-		zImage dtbs modules -j$$(nproc 2>/dev/null || echo 4)
+		zImage modules -j$$(nproc 2>/dev/null || echo 4) && \
+	echo -e "$(YELLOW)Note: DTB generation skipped (not required for current build)$(NC)"
 	@echo -e "$(GREEN)Kernel build complete$(NC)"
 	@if [ -f "$(KERNEL_BUILD_DIR)/arch/arm/boot/zImage" ]; then \
 		echo -e "$(GREEN)✓ Kernel image: $(KERNEL_BUILD_DIR)/arch/arm/boot/zImage$(NC)"; \
