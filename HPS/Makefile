@@ -224,23 +224,23 @@ clean:
 	@if [ -f "$(LINUX_IMAGE_DIR)/Makefile" ]; then \
 		$(MAKE) -C $(LINUX_IMAGE_DIR) clean || true; \
 	else \
-		echo -e "$(GREEN)✓ Linux image Makefile not found, skipping$(NC)"; \
+		echo -e "$(GREEN)[OK] Linux image Makefile not found, skipping$(NC)"; \
 	fi
 	@echo -e "$(YELLOW)Cleaning application build artifacts...$(NC)"
 	@if [ -f "$(APPLICATIONS_DIR)/Makefile" ]; then \
 		$(MAKE) -C $(APPLICATIONS_DIR) clean || true; \
 	else \
-		echo -e "$(GREEN)✓ Applications Makefile not found, skipping$(NC)"; \
+		echo -e "$(GREEN)[OK] Applications Makefile not found, skipping$(NC)"; \
 	fi
 	@echo -e "$(YELLOW)Cleaning driver build artifacts...$(NC)"
 	@if [ -f "$(DRIVERS_DIR)/Makefile" ]; then \
 		$(MAKE) -C $(DRIVERS_DIR) clean || true; \
 	else \
-		echo -e "$(GREEN)✓ Drivers Makefile not found, skipping$(NC)"; \
+		echo -e "$(GREEN)[OK] Drivers Makefile not found, skipping$(NC)"; \
 	fi
 	@echo -e "$(YELLOW)Removing top-level build directory...$(NC)"
 	@rm -rf build
-	@echo -e "$(GREEN)✓ Clean complete$(NC)"
+	@echo -e "$(GREEN)[OK] Clean complete$(NC)"
 
 clean-all: clean
 	@echo -e "$(YELLOW)===========================================$(NC)"
@@ -250,7 +250,7 @@ clean-all: clean
 	@if [ -f "$(LINUX_IMAGE_DIR)/kernel/Makefile" ]; then \
 		$(MAKE) -C $(LINUX_IMAGE_DIR)/kernel kernel-distclean || true; \
 	else \
-		echo -e "$(GREEN)✓ Kernel Makefile not found, skipping$(NC)"; \
+		echo -e "$(GREEN)[OK] Kernel Makefile not found, skipping$(NC)"; \
 	fi
 	@echo ""
 	@echo -e "$(YELLOW)Step 2/2: Cleaning debootstrap cache...$(NC)"
@@ -258,9 +258,9 @@ clean-all: clean
 		CACHE_SIZE=$$(du -sh /var/cache/debootstrap 2>/dev/null | cut -f1 || echo "unknown"); \
 		echo -e "$(YELLOW)Debootstrap cache size: $$CACHE_SIZE$(NC)"; \
 		sudo rm -rf /var/cache/debootstrap/* 2>/dev/null || true; \
-		echo -e "$(GREEN)✓ Debootstrap cache cleaned$(NC)"; \
+		echo -e "$(GREEN)[OK] Debootstrap cache cleaned$(NC)"; \
 	else \
-		echo -e "$(GREEN)✓ Debootstrap cache not found (already clean)$(NC)"; \
+		echo -e "$(GREEN)[OK] Debootstrap cache not found (already clean)$(NC)"; \
 	fi
 	@echo ""
 	@echo -e "$(GREEN)===========================================$(NC)"

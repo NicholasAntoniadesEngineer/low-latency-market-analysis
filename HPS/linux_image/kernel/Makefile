@@ -260,9 +260,9 @@ kernel-build: kernel-config kernel-integrate-driver
 	echo -e "$(YELLOW)Note: DTB generation skipped (not required for current build)$(NC)"
 	@echo -e "$(GREEN)Kernel build complete$(NC)"
 	@if [ -f "$(KERNEL_BUILD_DIR)/arch/arm/boot/zImage" ]; then \
-		echo -e "$(GREEN)✓ Kernel image: $(KERNEL_BUILD_DIR)/arch/arm/boot/zImage$(NC)"; \
+		echo -e "$(GREEN)[OK] Kernel image: $(KERNEL_BUILD_DIR)/arch/arm/boot/zImage$(NC)"; \
 	else \
-		echo -e "$(RED)✗ Kernel image not found!$(NC)"; \
+		echo -e "$(RED)[ERROR] Kernel image not found!$(NC)"; \
 		exit 1; \
 	fi
 	@DTB_FOUND=""; \
@@ -273,9 +273,9 @@ kernel-build: kernel-config kernel-integrate-driver
 		fi; \
 	done; \
 	if [ -n "$$DTB_FOUND" ]; then \
-		echo -e "$(GREEN)✓ Device tree: $(KERNEL_BUILD_DIR)/arch/arm/boot/dts/$$DTB_FOUND$(NC)"; \
+		echo -e "$(GREEN)[OK] Device tree: $(KERNEL_BUILD_DIR)/arch/arm/boot/dts/$$DTB_FOUND$(NC)"; \
 	else \
-		echo -e "$(YELLOW)⚠ Device tree not found (check build/arch/arm/boot/dts/ for available DTBs)$(NC)"; \
+		echo -e "$(YELLOW)[WARN] Device tree not found (check build/arch/arm/boot/dts/ for available DTBs)$(NC)"; \
 	fi
 
 kernel-modules: kernel-build
@@ -297,7 +297,7 @@ kernel-distclean: kernel-clean
 		echo -e "$(YELLOW)Removing kernel source directory (size: $$KERNEL_SIZE)...$(NC)"; \
 		echo -e "$(YELLOW)This may take a few minutes for large directories...$(NC)"; \
 		rm -rf $(KERNEL_DIR); \
-		echo -e "$(GREEN)✓ Kernel source removed$(NC)"; \
+		echo -e "$(GREEN)[OK] Kernel source removed$(NC)"; \
 	else \
-		echo -e "$(GREEN)✓ Kernel source directory not found (already clean)$(NC)"; \
+		echo -e "$(GREEN)[OK] Kernel source directory not found (already clean)$(NC)"; \
 	fi

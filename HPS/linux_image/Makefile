@@ -145,18 +145,18 @@ fpga:
 		if [ -n "$$latest_rbf" ]; then \
 			rbf_size=$$(du -h "$$latest_rbf" | cut -f1); \
 			rbf_date=$$(date -r "$$latest_rbf" "+%Y-%m-%d %H:%M"); \
-			echo "✓ Found FPGA bitstream: $$latest_rbf"; \
+			echo "[OK] Found FPGA bitstream: $$latest_rbf"; \
 			echo "  Size: $$rbf_size | Modified: $$rbf_date"; \
 			\
 			# Check if RBF is older than 24 hours \
 			current_time=$$(date +%s); \
 			age_hours=$$(( (current_time - latest_time) / 3600 )); \
 			if [ $$age_hours -gt 24 ]; then \
-				echo "⚠️  WARNING: RBF file is $$age_hours hours old"; \
+				echo "[WARN] RBF file is $$age_hours hours old"; \
 				echo "   Consider rebuilding FPGA bitstream if design changes were made"; \
 			fi; \
 		else \
-			echo "✗ No FPGA bitstream (RBF) files found"; \
+			echo "[NOT FOUND] No FPGA bitstream (RBF) files found"; \
 			echo "  Searched locations:"; \
 			echo "    - ../../build/output_files/*.rbf"; \
 			echo "    - $(FPGA_DIR)/build/output_files/*.rbf"; \
@@ -255,13 +255,13 @@ sd-image: fpga
 		echo -e "$(YELLOW)Kernel not found, building...$(NC)"; \
 		$(MAKE) kernel; \
 	else \
-		echo -e "$(GREEN)✓ Kernel already built$(NC)"; \
+		echo -e "$(GREEN)[OK] Kernel already built$(NC)"; \
 	fi; \
 	if [ ! -f "$(ROOTFS_DIR)/build/rootfs.tar.gz" ]; then \
 		echo -e "$(YELLOW)Rootfs not found, building...$(NC)"; \
 		$(MAKE) rootfs; \
 	else \
-		echo -e "$(GREEN)✓ Rootfs already built$(NC)"; \
+		echo -e "$(GREEN)[OK] Rootfs already built$(NC)"; \
 	fi
 	@echo -e "$(GREEN)===========================================$(NC)"
 	@echo -e "$(GREEN)SD Card Image Creation$(NC)"

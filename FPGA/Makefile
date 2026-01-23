@@ -34,6 +34,13 @@ WHICH := which
 # Helpful Macros
 SPACE := $(empty) $(empty)
 
+# Colors for output  
+GREEN := \033[0;32m
+YELLOW := \033[1;33m
+BLUE := \033[0;34m
+RED := \033[0;31m
+NC := \033[0m
+
 ifndef COMSPEC
 ifdef ComSpec
 COMSPEC = $(ComSpec)
@@ -214,18 +221,18 @@ check-tools:
 	@$(ECHO) ""
 	@$(ECHO) "Quartus detection:"
 	@if [ -n "$(QUARTUS_SH)" ]; then \
-		$(ECHO) "  ✓ Found: $(QUARTUS_SH)"; \
+		$(ECHO) "  [OK] Found: $(QUARTUS_SH)"; \
 		$(ECHO) "  HAVE_QUARTUS: $(HAVE_QUARTUS)"; \
 	else \
-		$(ECHO) "  ✗ Not found in PATH or standard locations"; \
+		$(ECHO) "  [NOT FOUND] Not found in PATH or standard locations"; \
 	fi
 	@$(ECHO) ""
 	@$(ECHO) "QSys detection:"
 	@if [ -n "$(QSYS_GENERATE)" ]; then \
-		$(ECHO) "  ✓ Found: $(QSYS_GENERATE)"; \
+		$(ECHO) "  [OK] Found: $(QSYS_GENERATE)"; \
 		$(ECHO) "  HAVE_QSYS_GENERATE: $(HAVE_QSYS_GENERATE)"; \
 	else \
-		$(ECHO) "  ✗ Not found in PATH or standard locations"; \
+		$(ECHO) "  [NOT FOUND] Not found in PATH or standard locations"; \
 	fi
 	@$(ECHO) ""
 	@$(ECHO) "Searching common installation directories..."
@@ -242,9 +249,9 @@ check-tools:
 	@$(ECHO) ""
 	@$(ECHO) "SoC EDS detection:"
 	@if [ -n "$(SBT.CREATE_SETTINGS)" ]; then \
-		$(ECHO) "  ✓ Found: $(SBT.CREATE_SETTINGS)"; \
+		$(ECHO) "  [OK] Found: $(SBT.CREATE_SETTINGS)"; \
 	else \
-		$(ECHO) "  ✗ Not found"; \
+		$(ECHO) "  [NOT FOUND] Not found"; \
 		if [ -n "$$SOCEDS_DEST_ROOT" ]; then \
 			$(ECHO) "    SOCEDS_DEST_ROOT is set to: $$SOCEDS_DEST_ROOT"; \
 			$(ECHO) "    But bsp-create-settings not found there"; \
@@ -380,17 +387,17 @@ endif
 	@$(ECHO) "==========================================="
 	@$(ECHO) ""
 ifneq ($(QSYS_FILE),)
-	@$(ECHO) "✓ QSys generation: Complete"
+	@$(ECHO) "[OK] QSys generation: Complete"
 	@if [ -f "$(QSYS_SOPCINFO)" ]; then \
 		$(ECHO) "  - SOPCINFO: $(QSYS_SOPCINFO)"; \
 	fi
 else
-	@$(ECHO) "✗ QSys generation: Skipped (no QSys file)"
+	@$(ECHO) "[SKIP] QSys generation: Skipped (no QSys file)"
 endif
 	@$(ECHO) ""
 ifeq ($(HAVE_QUARTUS),1)
 ifneq ($(QUARTUS_BASE),)
-	@$(ECHO) "✓ FPGA bitstream: Complete"
+	@$(ECHO) "[OK] FPGA bitstream: Complete"
 	@if [ -f "$(QUARTUS_SOF)" ]; then \
 		$(ECHO) "  - SOF file: $(QUARTUS_SOF)"; \
 	fi
@@ -398,14 +405,14 @@ ifneq ($(QUARTUS_BASE),)
 		$(ECHO) "  - RBF file: $(QUARTUS_RBF)"; \
 	fi
 else
-	@$(ECHO) "✗ FPGA bitstream: Skipped (no Quartus project)"
+	@$(ECHO) "[SKIP] FPGA bitstream: Skipped (no Quartus project)"
 endif
 else
-	@$(ECHO) "✗ FPGA bitstream: Skipped (Quartus not available)"
+	@$(ECHO) "[SKIP] FPGA bitstream: Skipped (Quartus not available)"
 endif
 	@$(ECHO) ""
 ifneq ($(SBT.CREATE_SETTINGS),)
-	@$(ECHO) "✓ HPS software: Complete"
+	@$(ECHO) "[OK] HPS software: Complete"
 	@if [ -f "$(DEVICE_TREE_BLOB)" ]; then \
 		$(ECHO) "  - Device tree: $(DEVICE_TREE_BLOB)"; \
 	fi
@@ -413,7 +420,7 @@ ifneq ($(SBT.CREATE_SETTINGS),)
 		$(ECHO) "  - SD card image: $(SD_FAT_TGZ)"; \
 	fi
 else
-	@$(ECHO) "✗ HPS software: Skipped (SoC EDS not available)"
+	@$(ECHO) "[SKIP] HPS software: Skipped (SoC EDS not available)"
 endif
 	@$(ECHO) ""
 	@TEST_EXE=""; \
@@ -425,10 +432,10 @@ endif
 		TEST_EXE=$$($(FIND) . -maxdepth 4 -path "*/calculator_test/calculator_test" 2>/dev/null | $(HEAD) -n1); \
 	fi; \
 	if [ -n "$$TEST_EXE" ] && [ -f "$$TEST_EXE" ]; then \
-		$(ECHO) "✓ Test suite: Complete"; \
+		$(ECHO) "[OK] Test suite: Complete"; \
 		$(ECHO) "  - Executable: $$TEST_EXE"; \
 	else \
-		$(ECHO) "✗ Test suite: Skipped or failed"; \
+		$(ECHO) "[SKIP] Test suite: Skipped or failed"; \
 	fi
 	@$(ECHO) ""
 	@$(ECHO) "==========================================="
@@ -553,6 +560,26 @@ clean:
 	@$(RM) $(wildcard boot.script u-boot.scr sd_fat.tar.gz)
 	@$(ECHO) "Build artifacts and generated files cleaned successfully"
 	@$(ECHO) "  Run 'make all' to rebuild everything"
+
+HELP_TARGETS += clean-all
+clean-all.HELP := Deep clean including all cached and downloaded content
+
+.PHONY: clean-all
+clean-all: clean
+	@$(ECHO) "==========================================="
+	@$(ECHO) "Performing deep clean..."
+	@$(ECHO) "==========================================="
+	@$(ECHO) "Removing QSys generated directories..."
+	@$(RM) $(GENERATED_DIR)
+	@$(ECHO) "Removing all Quartus project cache..."
+	@$(RM) $(wildcard $(QUARTUS_DIR)/db $(QUARTUS_DIR)/incremental_db $(QUARTUS_DIR)/greybox_tmp)
+	@$(RM) $(wildcard $(QUARTUS_DIR)/simulation)
+	@$(ECHO) "Removing HPS handoff files..."
+	@$(RM) $(wildcard hps_isw_handoff)
+	@$(RM) $(wildcard quartus/hps_isw_handoff)
+	@$(ECHO) "==========================================="
+	@$(ECHO) "Deep clean complete!"
+	@$(ECHO) "==========================================="
 ################################################
 
 
@@ -1331,19 +1358,19 @@ all: $(ALL_DEPS)
 ifeq ($(HAVE_QUARTUS),1)
 ifneq ($(QUARTUS_BASE),)
 	@if [ -f "$(QUARTUS_SOF)" ]; then \
-		$(ECHO) "✓ FPGA bitstream built successfully"; \
+		$(ECHO) "[OK] FPGA bitstream built successfully"; \
 		$(ECHO) "  SOF file: $(QUARTUS_SOF)"; \
 		if [ -f "$(QUARTUS_RBF)" ]; then \
 			$(ECHO) "  RBF file: $(QUARTUS_RBF)"; \
 		fi; \
 	else \
-		$(ECHO) "⚠ FPGA bitstream not found (may need to run 'make sof')"; \
+		$(ECHO) "[WARN] FPGA bitstream not found (may need to run 'make sof')"; \
 	fi
 else
-	@$(ECHO) "⚠ FPGA bitstream: Skipped (no Quartus project found)"
+	@$(ECHO) "[WARN] FPGA bitstream: Skipped (no Quartus project found)"
 endif
 else
-	@$(ECHO) "⚠ FPGA bitstream: Skipped (Quartus not in PATH)"
+	@$(ECHO) "[WARN] FPGA bitstream: Skipped (Quartus not in PATH)"
 	@$(ECHO) "  To build FPGA bitstream, add Quartus to PATH:"
 	@$(ECHO) "    export PATH=\$$PATH:/path/to/intelFPGA/20.1/quartus/bin"
 	@$(ECHO) "  Or run: make sof  (if Quartus is installed)"
