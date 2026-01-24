@@ -450,7 +450,7 @@ applications:
 # SD Card Image Targets
 # ============================================================================
 
-sd-image: fpga-check
+sd-image: fpga
 	$(call log_header,SD Card Image Creation)
 	$(call log_info,Building kernel and rootfs (parallel=$(PARALLEL_BUILD)))
 	$(call start_timer,sd-image-total)

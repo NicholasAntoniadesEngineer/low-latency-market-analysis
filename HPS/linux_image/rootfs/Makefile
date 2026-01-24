@@ -234,33 +234,84 @@ rootfs-native:
 	@$(MAKE) rootfs-native-internal
 
 rootfs-native-internal:
+	@# Refresh sudo session (already validated in rootfs target)
+	@if [ "$$(id -u)" -ne 0 ]; then sudo -v 2>/dev/null || true; fi
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Setting up native build environment..."
 	@mkdir -p $(WSL_BUILD_DIR)
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Build directory: $(WSL_BUILD_DIR)"
+	@# Check base cache validity and copy if available
+	@WSL_BASE_TAR="$(WSL_BUILD_DIR)/build/rootfs_base.tar.gz"; \
+	WSL_BASE_HASH="$(WSL_BUILD_DIR)/build/.rootfs_base_hash"; \
+	current_hash=$$(md5sum $(BASE_SOURCES) 2>/dev/null | md5sum | cut -d' ' -f1); \
+	if [ -f "$(ROOTFS_BASE_TAR)" ] && [ -f "$(ROOTFS_BASE_HASH)" ]; then \
+		cached_hash=$$(cat $(ROOTFS_BASE_HASH)); \
+		if [ "$$current_hash" = "$$cached_hash" ]; then \
+			echo -e "$(GREEN)[CACHE HIT]$(NC) Base image is valid - copying to native filesystem"; \
+			mkdir -p $$(dirname $$WSL_BASE_TAR); \
+			cp -f $(ROOTFS_BASE_TAR) $$WSL_BASE_TAR; \
+			cp -f $(ROOTFS_BASE_HASH) $$WSL_BASE_HASH; \
+		else \
+			echo -e "$(YELLOW)[CACHE STALE]$(NC) packages.txt changed - will rebuild base"; \
+		fi; \
+	else \
+		echo -e "$(YELLOW)[CACHE MISS]$(NC) No base cache found - will build from scratch"; \
+	fi
 	@# Copy necessary files to native filesystem
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Copying build files..."
 	@cp -f $(BUILD_SCRIPT) $(WSL_BUILD_DIR)/
 	@cp -f $(CURDIR)/packages.txt $(WSL_BUILD_DIR)/ 2>/dev/null || true
 	@cp -rf $(CURDIR)/configs $(WSL_BUILD_DIR)/ 2>/dev/null || true
 	@cp -rf $(CURDIR)/scripts $(WSL_BUILD_DIR)/ 2>/dev/null || true
-	@# Create a minimal Makefile for the native build
+	@# Create a proper Makefile for the native build with caching support
 	@echo 'SHELL := /bin/bash' > $(WSL_BUILD_DIR)/Makefile.native
 	@echo 'BUILD_DIR := $(WSL_BUILD_DIR)/build' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo 'ROOTFS_DIR := $$(BUILD_DIR)/rootfs' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo 'ROOTFS_TAR := $$(BUILD_DIR)/rootfs.tar.gz' >> $(WSL_BUILD_DIR)/Makefile.native
-	@echo '.PHONY: build' >> $(WSL_BUILD_DIR)/Makefile.native
-	@echo 'build:' >> $(WSL_BUILD_DIR)/Makefile.native
-	@echo '	@mkdir -p $$(BUILD_DIR)' >> $(WSL_BUILD_DIR)/Makefile.native
-	@echo '	@export ROOTFS_DIR="$$(ROOTFS_DIR)" ROOTFS_TAR="$$(ROOTFS_TAR)" && bash ./build_rootfs.sh' >> $(WSL_BUILD_DIR)/Makefile.native
-	@# Run build on native filesystem
+	@echo 'ROOTFS_BASE_TAR := $$(BUILD_DIR)/rootfs_base.tar.gz' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo 'ROOTFS_BASE_HASH := $$(BUILD_DIR)/.rootfs_base_hash' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo 'BASE_SOURCES := packages.txt' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '.PHONY: build base-image' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo 'build: base-image' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '	@# Check if we can use cached base' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '	@if [ -f "$$(ROOTFS_BASE_TAR)" ]; then \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		echo "[CACHE HIT] Using cached base image"; \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		mkdir -p $$(ROOTFS_DIR); \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		tar -xzf $$(ROOTFS_BASE_TAR) -C $$(ROOTFS_DIR); \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '	else \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		echo "[CACHE MISS] Base image not found - full build required"; \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		$$(MAKE) base-image; \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		mkdir -p $$(ROOTFS_DIR); \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		tar -xzf $$(ROOTFS_BASE_TAR) -C $$(ROOTFS_DIR); \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '	fi' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '	@export ROOTFS_DIR="$$(ROOTFS_DIR)" ROOTFS_TAR="$$(ROOTFS_TAR)" BASE_ONLY=0 && bash ./build_rootfs.sh' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo 'base-image:' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '	@set -e; \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		current_hash=$$$$(md5sum $$(BASE_SOURCES) 2>/dev/null | md5sum | cut -d" " -f1); \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		if [ -f "$$(ROOTFS_BASE_TAR)" ] && [ -f "$$(ROOTFS_BASE_HASH)" ]; then \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '			cached_hash=$$$$(cat $$(ROOTFS_BASE_HASH)); \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '			if [ "$$$$current_hash" = "$$$$cached_hash" ]; then \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '				echo "[CACHE VALID] Base image is up-to-date"; \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '				exit 0; \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '			fi; \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		fi; \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		echo "Building Base Image (this takes 15-20 min)..."; \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		export ROOTFS_DIR="$$(BUILD_DIR)/rootfs" ROOTFS_TAR="$$(ROOTFS_BASE_TAR)" BASE_ONLY=1 && bash ./build_rootfs.sh; \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		md5sum $$(BASE_SOURCES) 2>/dev/null | md5sum | cut -d" " -f1 > $$(ROOTFS_BASE_HASH)' >> $(WSL_BUILD_DIR)/Makefile.native
+	@# Run build on native filesystem (sudo already validated)
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Running build on native filesystem..."
-	@cd $(WSL_BUILD_DIR) && sudo make -f Makefile.native build
-	@# Copy results back
+	@if [ "$$(id -u)" -eq 0 ]; then \
+		cd $(WSL_BUILD_DIR) && make -f Makefile.native build; \
+	else \
+		cd $(WSL_BUILD_DIR) && sudo -E make -f Makefile.native build; \
+	fi
+	@# Copy results back and update cache
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Copying results back to project..."
 	@mkdir -p $(BUILD_DIR)
 	@cp -f $(WSL_BUILD_DIR)/build/rootfs.tar.gz $(ROOTFS_TAR)
 	@if [ -f "$(WSL_BUILD_DIR)/build/rootfs_base.tar.gz" ]; then \
 		cp -f $(WSL_BUILD_DIR)/build/rootfs_base.tar.gz $(ROOTFS_BASE_TAR); \
+		cp -f $(WSL_BUILD_DIR)/build/.rootfs_base_hash $(ROOTFS_BASE_HASH) 2>/dev/null || true; \
+		echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Base cache updated"; \
 	fi
 	@echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Rootfs built on native filesystem and copied back"
 	@echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Result: $(ROOTFS_TAR)"
@@ -274,7 +325,17 @@ rootfs-local-internal: deps-check $(ROOTFS_BASE_TAR) $(OVERLAY_SOURCES)
 
 # Main rootfs target - auto-detects WSL and redirects if needed
 rootfs:
-	@if [ "$(WSL_NATIVE_BUILD)" = "1" ]; then \
+	@set -e; \
+	if [ "$$(id -u)" -ne 0 ]; then \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Validating sudo access..."; \
+		if ! sudo -n true 2>/dev/null; then \
+			echo -e "$(YELLOW)Rootfs build requires sudo privileges.$(NC)"; \
+			echo -e "$(YELLOW)Please enter your password (will be cached for this build):$(NC)"; \
+			sudo -v || (echo -e "$(RED)ERROR: Sudo authentication failed$(NC)" && exit 1); \
+		fi; \
+		sudo -v; \
+	fi; \
+	if [ "$(WSL_NATIVE_BUILD)" = "1" ]; then \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | WSL detected with Windows filesystem"; \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Redirecting build to native filesystem: $(WSL_BUILD_DIR)"; \
 		$(MAKE) rootfs-native; \

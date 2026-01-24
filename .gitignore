@@ -1,17 +1,15 @@
 # ============================================================================
 # FPGA Project .gitignore
 # ============================================================================
-# Ignores build artifacts, generated files, and temporary files
-# Keep source files under version control
+# Ignores intermediate build artifacts and temporary files
+# KEEPS final build outputs needed for deployment and rebuilding
 # ============================================================================
 
-# Intermediate Build Artifacts (keep complete outputs)
-# Note: Complete build outputs (*.sof, *.rbf, generated/, build/output_files/) are KEPT
-
-# Quartus Database and Temporary Files
+# ============================================================================
+# Quartus Database and Temporary Files (intermediate)
+# ============================================================================
 db/
 incremental_db/
-output_files/
 .qsys_edit/
 *.qws
 *.bak
@@ -21,19 +19,62 @@ output_files/
 *.smsg
 *.done
 *.chg
-*.qdf
 *.qarlog
 *.html
 *.csv
 *.txt.user
 
-# QSys/Platform Designer Generated
-*.sopcinfo
+# ============================================================================
+# Quartus Build Outputs (intermediate, but keep final RBF/SOF)
+# ============================================================================
+# Ignore intermediate build directories, but keep final outputs
+FPGA/build/db/
+FPGA/build/incremental_db/
+FPGA/build/reports/
+FPGA/quartus/db/
+FPGA/quartus/incremental_db/
+FPGA/quartus/*.rpt
+FPGA/quartus/*.summary
+FPGA/quartus/*.done
+
+# Keep final FPGA bitstreams (needed for deployment)
+!FPGA/build/output_files/*.rbf
+!FPGA/build/output_files/*.sof
+
+# ============================================================================
+# QSys/Platform Designer Generated Files
+# ============================================================================
+# Keep QSys generated files (needed for DTB generation and Quartus compilation)
+# but ignore temporary generation scripts
 *_generation_script*
 *.sip
 *.spd
+*.qsys_check_normalized.*
 
-# Modelsim/Simulation
+# Keep QSys outputs (synthesis files, sopcinfo) - needed for rebuilding
+!FPGA/generated/**/*.qip
+!FPGA/generated/**/*.v
+!FPGA/generated/**/*.sv
+!FPGA/generated/**/*.sopcinfo
+!FPGA/generated/**/*.xml
+!FPGA/generated/**/*.svd
+!FPGA/generated/**/*.regmap
+!FPGA/generated/**/*.cmp
+
+# ============================================================================
+# Device Tree Files
+# ============================================================================
+# Ignore intermediate DTS files, but keep final DTB (needed for boot)
+*.dts
+FPGA/generated/*.dts
+
+# Keep final DTB file (needed for boot)
+!FPGA/generated/soc_system.dtb
+!FPGA/generated/*.dtb
+
+# ============================================================================
+# Modelsim/Simulation (intermediate)
+# ============================================================================
 *.vcd
 *.wlf
 transcript
@@ -41,36 +82,111 @@ work/
 vsim.wlf
 modelsim.ini
 
-# HPS Handoff
+# ============================================================================
+# HPS Handoff (intermediate)
+# ============================================================================
 hps_isw_handoff/
+FPGA/hps_isw_handoff/
 
+# ============================================================================
 # HPS Software Build Artifacts
-HPS/preloader/
-HPS/spl_bsp/
-HPS/*/build/
-HPS/*/*/build/
-HPS/*/*/*.o
-HPS/*/*/*.d
-HPS/*/*/*.elf
-HPS/*/*/*.bin
-# HPS/*/*/*.img
-HPS/*/*/*.log
-*.dep
+# ============================================================================
+# Ignore intermediate build artifacts, but keep final binaries
 
-# Device Tree Files (generated)
-*.dtb
-*.dts
+# Object files and intermediate build artifacts
+HPS/**/*.o
+HPS/**/*.d
+HPS/**/*.elf
+HPS/**/*.dep
+HPS/**/*.log
 
-# U-Boot Files
+# Build directories (intermediate), but keep final outputs
+HPS/linux_image/kernel/build/drivers/
+HPS/linux_image/kernel/build/fs/
+HPS/linux_image/kernel/build/include/
+HPS/linux_image/kernel/build/init/
+HPS/linux_image/kernel/build/ipc/
+HPS/linux_image/kernel/build/kernel/
+HPS/linux_image/kernel/build/lib/
+HPS/linux_image/kernel/build/mm/
+HPS/linux_image/kernel/build/net/
+HPS/linux_image/kernel/build/scripts/
+HPS/linux_image/kernel/build/security/
+HPS/linux_image/kernel/build/sound/
+HPS/linux_image/kernel/build/tools/
+HPS/linux_image/kernel/build/usr/
+HPS/linux_image/kernel/build/vmlinux
+HPS/linux_image/kernel/build/.config.old
+HPS/linux_image/kernel/build/System.map
+HPS/linux_image/kernel/build/.tmp_versions/
+HPS/linux_image/kernel/build/.missing-syscalls.d
+HPS/linux_image/kernel/build/modules.builtin
+HPS/linux_image/kernel/build/modules.order
+
+# Keep final kernel binary (needed for boot)
+!HPS/linux_image/kernel/build/arch/arm/boot/zImage
+!HPS/linux_image/kernel/build/arch/arm/boot/dts/*.dtb
+
+# Rootfs build directory (intermediate), but keep final tarball
+HPS/linux_image/rootfs/build/rootfs/
+HPS/linux_image/rootfs/build/.rootfs_base_hash
+
+# Keep final rootfs tarball (needed for deployment)
+!HPS/linux_image/rootfs/build/rootfs.tar.gz
+!HPS/linux_image/rootfs/build/rootfs_base.tar.gz
+
+# Keep SD card image (final deployable artifact)
+!HPS/linux_image/build/*.img
+
+# Preloader build artifacts (intermediate)
+HPS/preloader/spl_bsp/
+HPS/preloader/uboot-socfpga/build/
+HPS/preloader/uboot-socfpga/.config
+HPS/preloader/uboot-socfpga/.config.old
+HPS/preloader/uboot-socfpga/System.map
+HPS/preloader/uboot-socfpga/u-boot
+HPS/preloader/uboot-socfpga/u-boot.bin
+HPS/preloader/uboot-socfpga/u-boot.srec
+HPS/preloader/uboot-socfpga/u-boot.map
+HPS/preloader/uboot-socfpga/*.o
+HPS/preloader/uboot-socfpga/*.d
+HPS/preloader/uboot-socfpga/*.log
+
+# Keep final bootloader binaries (needed for boot)
+!HPS/preloader/preloader-mkpimage.bin
+!HPS/preloader/uboot-socfpga/u-boot.img
+
+# Application build artifacts (intermediate)
+HPS/applications/**/build/
+HPS/applications/**/*.o
+HPS/applications/**/*.d
+
+# Keep final application binaries (needed for deployment)
+!HPS/applications/**/*.bin
+!HPS/applications/**/calculator_test
+!HPS/applications/**/hps_fpga_led_control
+!HPS/applications/**/boot_led
+
+# ============================================================================
+# U-Boot Scripts (generated)
+# ============================================================================
 u-boot.scr
 boot.script
+HPS/**/u-boot.scr
+HPS/**/boot.script
 
-# Archive and Package Files
+# ============================================================================
+# Archive and Package Files (intermediate)
+# ============================================================================
 tgz/
-*.tar.gz
+FPGA/tgz/
 *.zip
 
+# Keep rootfs tarballs (already handled above with ! patterns)
+
+# ============================================================================
 # IDE and Editor Files
+# ============================================================================
 .vscode/
 *.swp
 *.swo
@@ -78,62 +194,106 @@ tgz/
 .DS_Store
 *.pro.user
 
+# ============================================================================
+# Build System Files (intermediate)
+# ============================================================================
 # Stamp Files (Make timestamps)
 stamp/
+FPGA/stamp/
+**/stamp/
+
+# Build system cache files
+.tool_cache.mk
+.timing/
+build/.timing/
+**/.timing/
+
+# Temporary normalized scripts (created by Makefile for CRLF handling)
+*.normalized.*
+.*.normalized.*
 
 # Python Cache
 __pycache__/
 *.pyc
 *.pyo
 
-# Temporary normalized scripts (created by Makefile for CRLF handling)
-*.normalized.*
-.*.normalized.*
-
-# Build system cache files
-.tool_cache.mk
-.timing/
-build/.timing/
-
 # ============================================================================
-# KEEP THESE FILES (Do NOT ignore)
+# KEEP THESE FILES (Do NOT ignore) - Source Files
 # ============================================================================
 # Source HDL files
-!fpga/hdl/*.v
-!fpga/hdl/*.sv
-!fpga/hdl/*.vhd
+!FPGA/hdl/*.v
+!FPGA/hdl/*.sv
+!FPGA/hdl/*.vhd
 
 # IP Source files
-!fpga/ip/**/*.v
-!fpga/ip/**/*.sv
-!fpga/ip/**/*.vhd
-!fpga/ip/**/*.tcl
-!fpga/ip/**/*.qip
+!FPGA/ip/**/*.v
+!FPGA/ip/**/*.sv
+!FPGA/ip/**/*.vhd
+!FPGA/ip/**/*.tcl
+!FPGA/ip/**/*.qip
+!FPGA/ip/**/*.md
 
 # QSys Source
-!fpga/qsys/*.qsys
-!fpga/qsys/*.xml
+!FPGA/quartus/qsys/*.qsys
+!FPGA/quartus/qsys/*.xml
 
 # Quartus Project Files
-!fpga/quartus/*.qpf
-!fpga/quartus/*.qsf
-!fpga/quartus/*.sdc
-!fpga/quartus/*.qdf
+!FPGA/quartus/*.qpf
+!FPGA/quartus/*.qsf
+!FPGA/quartus/*.sdc
 
 # Documentation
-!docs/*.md
+!documentation/**/*.md
 !*.md
 !README*
+!**/README*
+!**/README.md
 
 # Makefiles and Scripts
 !Makefile
+!**/Makefile
 !*.sh
 !*.bat
 
 # HPS Software Source
-!hps/**/*.c
-!hps/**/*.h
-!hps/**/Makefile
-!hps/**/*.sh
-!hps/**/*.bat
-!hps/**/*.md
+!HPS/**/*.c
+!HPS/**/*.h
+!HPS/**/*.cpp
+!HPS/**/*.hpp
+!HPS/**/*.S
+!HPS/**/*.lds
+!HPS/**/*.dtsi
+!HPS/**/Kconfig
+!HPS/**/defconfig
+
+# Configuration Files
+!HPS/**/packages.txt
+!HPS/**/*.conf
+!HPS/**/configs/**
+!HPS/**/scripts/**
+
+# ============================================================================
+# Final Build Artifacts Summary (KEPT)
+# ============================================================================
+# The following final artifacts are KEPT and should be committed:
+# 
+# FPGA:
+#   - FPGA/build/output_files/*.rbf (FPGA bitstream)
+#   - FPGA/build/output_files/*.sof (FPGA bitstream)
+#   - FPGA/generated/soc_system.dtb (Device tree)
+#   - FPGA/generated/soc_system.sopcinfo (QSys info for DTB generation)
+#   - FPGA/generated/soc_system/synthesis/* (QSys synthesis outputs)
+#
+# HPS:
+#   - HPS/linux_image/kernel/build/arch/arm/boot/zImage (Kernel binary)
+#   - HPS/linux_image/rootfs/build/rootfs.tar.gz (Root filesystem)
+#   - HPS/linux_image/build/*.img (SD card image)
+#   - HPS/preloader/preloader-mkpimage.bin (Preloader)
+#   - HPS/preloader/uboot-socfpga/u-boot.img (U-Boot)
+#   - HPS/applications/**/calculator_test (Application binaries)
+#
+# These artifacts are needed for:
+#   1. Deployment without rebuilding
+#   2. Reproducible builds
+#   3. Quick testing of changes
+# ============================================================================

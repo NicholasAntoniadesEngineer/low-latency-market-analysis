@@ -46,6 +46,7 @@ GREEN ?= \033[0;32m
 YELLOW ?= \033[1;33m
 BLUE ?= \033[0;34m
 CYAN ?= \033[0;36m
+RED ?= \033[0;31m
 NC ?= \033[0m
 
 # Timestamp for logging
@@ -311,7 +312,7 @@ rootfs-internal:
 			$(MAKE) -C $(ROOTFS_DIR); \
 		else \
 			echo "Rootfs build requires root - using sudo"; \
-			sudo $(MAKE) -C $(ROOTFS_DIR); \
+			sudo -E $(MAKE) -C $(ROOTFS_DIR); \
 		fi \
 	else \
 		echo "ERROR: Rootfs Makefile not found: $(ROOTFS_DIR)/Makefile"; \

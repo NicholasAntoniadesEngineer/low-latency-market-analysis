@@ -70,18 +70,18 @@ if ! command -v "$QSYS_GENERATE_CMD" >/dev/null 2>&1 && [ ! -f "$QSYS_GENERATE_C
 	exit 1
 fi
 
-echo "This may take seveal minutes..."
-# Note: SET_QSYS_GENERATE_ENV is handled by Makefile if needed (fo Cygwin)
-"$QSYS_GENERATE_CMD" "$QSYS_FILE" --synthesis=VERILOG --output-diectoy="$GENERATED_DIR/$QSYS_BASE" || {
+echo "This may take several minutes..."
+# Note: SET_QSYS_GENERATE_ENV is handled by Makefile if needed (for Cygwin)
+"$QSYS_GENERATE_CMD" "$QSYS_FILE" --synthesis=VERILOG --output-directory="$GENERATED_DIR/$QSYS_BASE" || {
 	echo ""
-	echo "WARNING: QSys geneation completed with eos (this may be non-citical)."
-	echo "HPS SDRAM geneation eos ae common if SoC EDS is not installed."
-	echo "Checking if citical files wee geneated..."
+	echo "WARNING: QSys generation completed with errors (this may be non-critical)."
+	echo "HPS SDRAM generation errors are common if SoC EDS is not installed."
+	echo "Checking if critical files were generated..."
 	if [ -f "$QSYS_SOPCINFO" ] && [ -f "$GENERATED_DIR/$QSYS_BASE/synthesis/$QSYS_BASE.qip" ]; then
-		echo "Citical files found - Quatus compilation may still wok."
-		echo "Ty compiling in Quatus. If it fails, install SoC EDS."
+		echo "Critical files found - Quartus compilation may still work."
+		echo "Try compiling in Quartus. If it fails, install SoC EDS."
 	else
-		echo "ERROR: Citical files missing. Please install SoC EDS and ety."
+		echo "ERROR: Critical files missing. Please install SoC EDS and retry."
 		exit 1
 	fi
 }
