@@ -49,8 +49,9 @@ KERNEL_SOURCES := $(KERNEL_CONFIG) \
 # Detect ccache availability
 CCACHE_PATH := $(shell command -v ccache 2>/dev/null)
 
-# Default: use ccache if available
+# Default: use ccache if available (and auto-install if missing)
 USE_CCACHE ?= 1
+CCACHE_AUTO_INSTALL ?= 1
 
 # Cross-compilation with optional ccache
 CROSS_COMPILE_BASE ?= arm-linux-gnueabihf-
@@ -60,9 +61,10 @@ ifneq ($(CCACHE_PATH),)
     CROSS_COMPILE := ccache $(CROSS_COMPILE_BASE)
     CCACHE_ENABLED := 1
 else
-    # ccache not found - use base compiler
+    # ccache not found - use base compiler (will try to install during build)
     CROSS_COMPILE := $(CROSS_COMPILE_BASE)
     CCACHE_ENABLED := 0
+    CCACHE_NEEDS_INSTALL := 1
 endif
 else
     # ccache explicitly disabled
@@ -85,9 +87,41 @@ GREEN := \033[0;32m
 YELLOW := \033[1;33m
 NC := \033[0m
 
-.PHONY: all help kernel-download kernel-config kernel-build kernel-modules kernel-clean kernel-integrate-driver check-rebuild rebuild force-rebuild ccache-stats
+.PHONY: all help kernel-download kernel-config kernel-build kernel-modules kernel-clean kernel-integrate-driver check-rebuild rebuild force-rebuild ccache-stats ccache-install ccache-check
 
 all: kernel-build
+
+# ============================================================================
+# ccache Auto-Installation
+# ============================================================================
+
+ccache-install:
+	@echo -e "$(YELLOW)Installing ccache for faster kernel builds...$(NC)"
+	@if command -v apt-get >/dev/null 2>&1; then \
+		sudo apt-get update -qq && sudo apt-get install -y -qq ccache && \
+		echo -e "$(GREEN)[OK] ccache installed successfully$(NC)"; \
+	elif command -v dnf >/dev/null 2>&1; then \
+		sudo dnf install -y ccache && \
+		echo -e "$(GREEN)[OK] ccache installed successfully$(NC)"; \
+	elif command -v pacman >/dev/null 2>&1; then \
+		sudo pacman -S --noconfirm ccache && \
+		echo -e "$(GREEN)[OK] ccache installed successfully$(NC)"; \
+	else \
+		echo -e "$(RED)Could not auto-install ccache - unknown package manager$(NC)"; \
+		echo "Please install ccache manually"; \
+		exit 1; \
+	fi
+
+ccache-check:
+	@if [ "$(USE_CCACHE)" = "1" ] && [ "$(CCACHE_AUTO_INSTALL)" = "1" ] && [ -z "$(CCACHE_PATH)" ]; then \
+		echo -e "$(YELLOW)[ccache] Not installed - attempting auto-install...$(NC)"; \
+		$(MAKE) ccache-install || true; \
+		if command -v ccache >/dev/null 2>&1; then \
+			echo -e "$(GREEN)[ccache] Now available - will be used for this build$(NC)"; \
+		else \
+			echo -e "$(YELLOW)[ccache] Installation failed - continuing without ccache$(NC)"; \
+		fi; \
+	fi
 	@echo -e "$(GREEN)===========================================$(NC)"
 	@echo -e "$(GREEN)Kernel build complete$(NC)"
 	@echo -e "$(GREEN)===========================================$(NC)"
@@ -332,7 +366,11 @@ $(KERNEL_BUILD_DIR)/.config: kernel-download
 		exit 1; \
 	fi; \
 	echo -e "$(YELLOW)Configuring kernel with: $$DEFCONFIG$(NC)"; \
-	make O=$(abspath $(KERNEL_BUILD_DIR)) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) $$DEFCONFIG || \
+	CCACHE_CMD=""; \
+	if [ "$(USE_CCACHE)" = "1" ] && command -v ccache >/dev/null 2>&1; then \
+		CCACHE_CMD="ccache "; \
+	fi; \
+	make O=$(abspath $(KERNEL_BUILD_DIR)) ARCH=$(ARCH) CROSS_COMPILE="$${CCACHE_CMD}$(CROSS_COMPILE_BASE)" $$DEFCONFIG || \
 	(echo -e "$(RED)ERROR: Failed to configure kernel with $$DEFCONFIG$(NC)" && exit 1)
 	@if [ -f "$(KERNEL_BUILD_DIR)/.config" ]; then \
 		echo -e "$(GREEN)Kernel configuration complete$(NC)"; \
@@ -345,14 +383,20 @@ $(KERNEL_BUILD_DIR)/.config: kernel-download
 kernel-integrate-driver: kernel-config
 	@echo -e "$(YELLOW)Integrating calculator driver...$(NC)"
 	@if [ -f "$(DRIVER_INTEGRATION)" ]; then \
+		if command -v dos2unix >/dev/null 2>&1; then \
+			dos2unix -q $(DRIVER_INTEGRATION) 2>/dev/null || true; \
+		else \
+			sed -i 's/\r$$//' $(DRIVER_INTEGRATION) 2>/dev/null || true; \
+		fi; \
 		bash $(DRIVER_INTEGRATION) -k $(KERNEL_DIR) -t userspace || \
 		(echo -e "$(YELLOW)Driver integration script not available, skipping...$(NC)"); \
 	else \
 		echo -e "$(YELLOW)Driver integration script not found, skipping...$(NC)"; \
 	fi
 
-kernel-build: kernel-config kernel-integrate-driver
-	@needs_rebuild=0; \
+kernel-build: ccache-check kernel-config kernel-integrate-driver
+	@set -e; \
+	needs_rebuild=0; \
 	if [ ! -f "$(KERNEL_BUILD_DIR)/arch/arm/boot/zImage" ]; then \
 		echo -e "$(YELLOW)Building kernel: image does not exist$(NC)"; \
 		needs_rebuild=1; \
@@ -380,18 +424,18 @@ kernel-build: kernel-config kernel-integrate-driver
 	fi; \
 	echo -e "$(YELLOW)Building kernel...$(NC)"; \
 	echo -e "$(YELLOW)This may take 10-30 minutes (faster with ccache)...$(NC)"; \
-	echo -e "$(YELLOW)Target: ARM Cortex-A9 (ARMv7-A) for DE10-Nano$(NC)"
-	@# Show ccache status
-ifeq ($(CCACHE_ENABLED),1)
-	@echo -e "$(GREEN)[ccache] ENABLED - using $(CCACHE_PATH)$(NC)"
-	@echo -e "$(GREEN)[ccache] Cache hits will dramatically speed up compilation$(NC)"
-else
-	@echo -e "$(YELLOW)[ccache] DISABLED - install ccache for faster rebuilds$(NC)"
-endif
-	@echo -e "$(YELLOW)Note: Cleaning build artifacts to ensure correct architecture flags...$(NC)"
-	@rm -rf $(KERNEL_BUILD_DIR)/arch/arm/kernel $(KERNEL_BUILD_DIR)/arch/arm/mm $(KERNEL_BUILD_DIR)/kernel
-	@echo -e "$(YELLOW)Patching kernel Makefile to use Cortex-A9 flags...$(NC)"
-	@cd $(KERNEL_DIR)/arch/arm && \
+	echo -e "$(YELLOW)Target: ARM Cortex-A9 (ARMv7-A) for DE10-Nano$(NC)"; \
+	CCACHE_NOW=$$(command -v ccache 2>/dev/null); \
+	if [ -n "$$CCACHE_NOW" ]; then \
+		echo -e "$(GREEN)[ccache] ENABLED - using $$CCACHE_NOW$(NC)"; \
+		echo -e "$(GREEN)[ccache] Cache hits will dramatically speed up compilation$(NC)"; \
+	else \
+		echo -e "$(YELLOW)[ccache] DISABLED - set CCACHE_AUTO_INSTALL=1 to auto-install$(NC)"; \
+	fi; \
+	echo -e "$(YELLOW)Note: Cleaning build artifacts to ensure correct architecture flags...$(NC)"; \
+	rm -rf $(KERNEL_BUILD_DIR)/arch/arm/kernel $(KERNEL_BUILD_DIR)/arch/arm/mm $(KERNEL_BUILD_DIR)/kernel; \
+	echo -e "$(YELLOW)Patching kernel Makefile to use Cortex-A9 flags...$(NC)"; \
+	cd $(KERNEL_DIR)/arch/arm && \
 	if ! grep -q "Wa,-mcpu=cortex-a9" Makefile; then \
 		sed -i 's/-Wa$$(comma)-march=armv7-a/-Wa$$(comma)-march=armv7-a -Wa$$(comma)-mcpu=cortex-a9/g' Makefile || \
 		sed -i 's/-Wa,-march=armv7-a/-Wa,-march=armv7-a -Wa,-mcpu=cortex-a9/g' Makefile || true; \
@@ -399,19 +443,23 @@ endif
 	if ! grep -q "mtune=cortex-a9" Makefile; then \
 		sed -i '/^KBUILD_CFLAGS[[:space:]]*+=/s/$$/ -mtune=cortex-a9 -mfpu=vfpv3/' Makefile && \
 		sed -i '/^KBUILD_AFLAGS[[:space:]]*+=/s/$$/ -mtune=cortex-a9 -mfpu=vfpv3/' Makefile || true; \
-	fi
-	@cd $(KERNEL_DIR) && \
-	make O=$(abspath $(KERNEL_BUILD_DIR)) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) \
-		zImage modules -j$$(nproc 2>/dev/null || echo 4) && \
-	echo -e "$(YELLOW)Note: DTB generation skipped (not required for current build)$(NC)"
-	@echo -e "$(GREEN)Kernel build complete$(NC)"
-	@if [ -f "$(KERNEL_BUILD_DIR)/arch/arm/boot/zImage" ]; then \
+	fi; \
+	CCACHE_CMD=""; \
+	if [ "$(USE_CCACHE)" = "1" ] && command -v ccache >/dev/null 2>&1; then \
+		CCACHE_CMD="ccache "; \
+	fi; \
+	cd $(KERNEL_DIR) && \
+	make O=$(abspath $(KERNEL_BUILD_DIR)) ARCH=$(ARCH) CROSS_COMPILE="$${CCACHE_CMD}$(CROSS_COMPILE_BASE)" \
+		zImage modules -j$$(nproc 2>/dev/null || echo 4); \
+	echo -e "$(YELLOW)Note: DTB generation skipped (not required for current build)$(NC)"; \
+	echo -e "$(GREEN)Kernel build complete$(NC)"; \
+	if [ -f "$(KERNEL_BUILD_DIR)/arch/arm/boot/zImage" ]; then \
 		echo -e "$(GREEN)[OK] Kernel image: $(KERNEL_BUILD_DIR)/arch/arm/boot/zImage$(NC)"; \
 	else \
 		echo -e "$(RED)[ERROR] Kernel image not found!$(NC)"; \
 		exit 1; \
-	fi
-	@DTB_FOUND=""; \
+	fi; \
+	DTB_FOUND=""; \
 	for dtb in socfpga_cyclone5_de10_nano.dtb socfpga_cyclone5_de0_nano_soc.dtb socfpga_cyclone5_socdk.dtb; do \
 		if [ -f "$(KERNEL_BUILD_DIR)/arch/arm/boot/dts/$$dtb" ]; then \
 			DTB_FOUND="$$dtb"; \

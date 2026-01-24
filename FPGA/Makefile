@@ -58,6 +58,42 @@ endif
 endif
 
 ################################################
+# Fast-path for Clean Targets
+################################################
+# Skip expensive tool detection when running clean targets.
+# This prevents hangs during 'make clean' operations.
+################################################
+
+CLEAN_TARGETS := clean clean-all clear-tool-cache show-tool-cache
+
+# Check if we're only running clean targets (no tool detection needed)
+ifneq ($(filter $(CLEAN_TARGETS),$(MAKECMDGOALS)),)
+ifeq ($(filter-out $(CLEAN_TARGETS),$(MAKECMDGOALS)),)
+SKIP_TOOL_DETECTION := 1
+endif
+endif
+
+################################################
+# Quartus Parallel Compilation
+################################################
+# Quartus Prime supports parallel compilation using multiple CPU cores.
+# This can significantly reduce FPGA compilation time (30-50% faster).
+#
+# Configuration:
+#   QUARTUS_PARALLEL_JOBS=N : Number of parallel jobs (default: auto-detect)
+#   QUARTUS_PARALLEL_JOBS=1 : Disable parallel compilation
+#
+# Note: Quartus uses environment variable NUM_PARALLEL_PROCESSORS
+################################################
+
+# Auto-detect CPU count for parallel Quartus compilation
+NPROC := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+QUARTUS_PARALLEL_JOBS ?= $(NPROC)
+
+# Export for Quartus to use
+export NUM_PARALLEL_PROCESSORS := $(QUARTUS_PARALLEL_JOBS)
+
+################################################
 # Tool Detection with Caching
 ################################################
 # Tool paths are cached to avoid expensive find operations on every make invocation.
@@ -68,8 +104,12 @@ endif
 #   make clear-tool-cache : Manually clear the cache
 ################################################
 
+# Always define these (needed for clean targets)
 TOOL_CACHE_FILE := $(CURDIR)/.tool_cache.mk
 TOOL_CACHE_MAX_AGE_MINUTES := 60
+
+# Skip expensive tool detection for clean targets (fast path)
+ifneq ($(SKIP_TOOL_DETECTION),1)
 
 # Check if cache exists and is recent (less than TOOL_CACHE_MAX_AGE_MINUTES old)
 TOOL_CACHE_VALID := $(shell \
@@ -241,6 +281,8 @@ QSYS_GENERATE_CMD := qsys-generate
 QSYS_EDIT_CMD := qsys-edit
 QSYS_SCRIPT_CMD := qsys-script
 endif
+
+endif # SKIP_TOOL_DETECTION (end of fast-path skip for clean targets)
 
 ################################################
 
@@ -926,7 +968,8 @@ $(QUARTUS_STAMP): $(QUARTUS_DEPS)
 	@$(MKDIR) $(BUILD_DIR)/output_files
 	@$(ECHO) "Compiling Quartus project: $(notdir $(QUARTUS_QPF))"
 	@$(ECHO) "Using Quartus: $(QUARTUS_SH_CMD)"
-	cd $(QUARTUS_DIR) && $(QUARTUS_SH_CMD) --flow compile $(notdir $(QUARTUS_QPF))
+	@$(ECHO) "Parallel jobs: $(QUARTUS_PARALLEL_JOBS) (set QUARTUS_PARALLEL_JOBS to override)"
+	cd $(QUARTUS_DIR) && $(QUARTUS_SH_CMD) --flow compile $(notdir $(QUARTUS_QPF)) -j$(QUARTUS_PARALLEL_JOBS)
 	@$(ECHO) "Checking for pin assignment TCL files to apply after map..."
 	@if [ -f "$(GENERATED_DIR)/$(QSYS_BASE)/synthesis/submodules/hps_sdram_p0_pin_assignments.tcl" ] || \
 	   [ -f "$(QSYS_DIR)/$(QSYS_BASE)/synthesis/submodules/hps_sdram_p0_pin_assignments.tcl" ] || \

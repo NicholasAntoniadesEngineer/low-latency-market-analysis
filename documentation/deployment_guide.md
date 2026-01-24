@@ -7,6 +7,8 @@ Complete guide for building, deploying, and running the DE10-Nano low-latency ma
 - [Quick Start](#quick-start)
 - [Prerequisites](#prerequisites)
 - [Build Process](#build-process)
+- [Parallelization](#parallelization)
+- [Caching](#caching)
 - [Deployment](#deployment)
 - [Network Setup](#network-setup)
 - [Testing](#testing)
@@ -16,27 +18,34 @@ Complete guide for building, deploying, and running the DE10-Nano low-latency ma
 
 ## Quick Start
 
-### 3-Step Build Process
+### One-Command Build (Recommended)
 
 ```bash
-# 1. Build FPGA bitstream
-cd FPGA && make qsys-generate && make sof && make rbf
-
-# 2. Build Linux system
-cd ../HPS/linux_image && sudo make kernel && sudo make rootfs
-
-# 3. Create SD card image
-sudo make sd-image
+# From repository root - builds everything with parallelization
+make everything
 ```
+
+This runs FPGA and HPS builds in parallel, then creates the SD card image.
 
 ### Deploy & Run
 
 ```bash
 # Flash SD card (replace /dev/sdX)
-sudo dd if=build/de10-nano-custom.img of=/dev/sdX bs=4M status=progress
+sudo dd if=HPS/linux_image/build/de10-nano-custom.img of=/dev/sdX bs=4M status=progress conv=fsync
 
 # Boot DE10-Nano and connect
-ssh root@<board-ip> && cd /root && ./calculator_test
+ssh root@<board-ip>
+./calculator_test
+```
+
+### Component Builds (Alternative)
+
+```bash
+# Build individual components from repo root
+make fpga          # FPGA only (~20-30 min)
+make kernel        # Kernel only (~10-20 min)
+make rootfs        # Rootfs only (~15-25 min)
+make sd-image      # SD image (requires FPGA artifacts)
 ```
 
 ---
@@ -73,53 +82,107 @@ which quartus  # Verify Quartus installation
 
 ### Build Hierarchy
 ```
-FPGA/ → Quartus FPGA project (HDL, QSys, bitstreams)
-HPS/linux_image/ → Linux build system (kernel, rootfs, SD image)
+Makefile (repo root)     → Top-level orchestration
+├── FPGA/Makefile        → FPGA build (QSys, Quartus, DTB)
+└── HPS/
+    ├── Makefile         → HPS orchestration
+    └── linux_image/
+        ├── Makefile     → Kernel + rootfs + SD image
+        ├── kernel/      → Kernel with ccache support
+        └── rootfs/      → Rootfs with base caching
 ```
 
-### Build Options
+### Build Commands
 
-**Complete build:**
+| Command | Description | Time |
+|---------|-------------|------|
+| `make everything` | Full parallel build | ~35-50 min |
+| `make fpga` | FPGA only (QSys + Quartus + RBF + DTB) | ~20-30 min |
+| `make kernel` | Linux kernel only | ~10-20 min |
+| `make rootfs` | Root filesystem only | ~15-25 min |
+| `make sd-image` | SD card image | ~2-5 min |
+| `make sd-image-update` | Incremental SD update | ~1-2 min |
+
+### Status and Diagnostics
+
 ```bash
-cd HPS && make everything  # FPGA + Linux + SD image
+make status          # Show all build artifact status
+make timing-report   # Show build timing statistics
+make help            # Show all available targets
 ```
 
-**Component builds:**
+---
+
+## Parallelization
+
+The build system uses multiple levels of parallelization:
+
+### Level 1: FPGA + HPS Parallel
 ```bash
-# FPGA
-cd FPGA && make qsys-generate && make sof && make rbf
-
-# Linux components
-cd ../HPS/linux_image
-sudo make kernel     # Kernel (~5-15min)
-sudo make rootfs     # Rootfs (~10-20min)
-sudo make sd-image   # SD image (~2-5min)
+make everything              # FPGA and HPS build simultaneously
+make everything-sequential   # Force sequential (low memory systems)
 ```
+**Configuration:** `PARALLEL_EVERYTHING=1/0`
 
-### Build Features
-- **Incremental builds** (massive time savings - only rebuilds when sources change)
-- **Automatic error recovery** (CRLF normalization, internet checks)
-- **Cross-platform support** (Windows/WSL/Linux path handling)
-- **Flexible targets** (individual component builds)
-- **Dependency management** (`make deps`)
-
-**Check for rebuilds before building:**
+### Level 2: Kernel + Rootfs Parallel
 ```bash
-# Check if kernel needs rebuild
-cd HPS/linux_image/kernel && make check-rebuild
-
-# Check if rootfs needs rebuild
-cd ../rootfs && make check-rebuild
+make sd-image    # Kernel and rootfs build simultaneously
 ```
+**Configuration:** `PARALLEL_BUILD=1/0`, `PARALLEL_JOBS=N`
+
+### Level 3: Quartus Parallel Compilation
+Quartus uses all CPU cores automatically for FPGA synthesis.
+**Configuration:** `QUARTUS_PARALLEL_JOBS=N` (default: auto-detect)
+
+### Level 4: Applications Parallel
+```bash
+make applications   # All apps build simultaneously
+```
+**Configuration:** `PARALLEL_APPS=1/0`
+
+### Build Time Comparison
+
+| Mode | Estimated Time | Use Case |
+|------|----------------|----------|
+| Full parallel | ~35-50 min | Normal builds |
+| Sequential | ~60-90 min | Low memory, debugging |
+| Incremental | ~5-15 min | After small changes |
+
+---
+
+## Caching
+
+### Tool Detection Cache
+Quartus/QSys paths are cached for 60 minutes to avoid slow filesystem searches.
+```bash
+make clear-tool-cache   # Force re-detection
+make show-tool-cache    # Display cached paths
+```
+
+### Rootfs Base Cache
+Debootstrap base image is cached and reused. Only rebuilds when `packages.txt` changes.
+```bash
+make show-cache-status  # Check cache validity
+make clean-base         # Force base rebuild
+```
+
+### Kernel ccache
+Install ccache for 50-80% faster kernel rebuilds:
+```bash
+sudo apt install ccache
+# Automatically enabled if available
+```
+**Configuration:** `USE_CCACHE=1/0`
 
 ### Build Outputs
 
-| Component | Output | Time |
-|-----------|--------|------|
-| FPGA | `FPGA/build/output_files/DE10_NANO_SoC_GHRD.rbf` | 5-15min |
-| Kernel | `HPS/linux_image/kernel/build/arch/arm/boot/zImage` | 5-15min |
-| Rootfs | `HPS/linux_image/rootfs/build/rootfs.tar.gz` | 10-20min |
-| SD Image | `HPS/linux_image/build/de10-nano-custom.img` | 2-5min |
+| Component | Output | Build Time |
+|-----------|--------|------------|
+| FPGA RBF | `FPGA/build/output_files/DE10_NANO_SoC_GHRD.rbf` | 15-25 min |
+| Device Tree | `FPGA/generated/soc_system.dtb` | 1 min |
+| Kernel | `HPS/linux_image/kernel/build/arch/arm/boot/zImage` | 10-20 min |
+| Rootfs | `HPS/linux_image/rootfs/build/rootfs.tar.gz` | 15-25 min |
+| SD Image | `HPS/linux_image/build/de10-nano-custom.img` | 2-5 min |
 
 ---
 
@@ -345,26 +408,47 @@ sudo PRELOADER_BIN=HPS/preloader/preloader-mkpimage.bin \
 ### Recovery Commands
 
 ```bash
-# Check if rebuild is needed (recommended first step)
-make check-rebuild  # Shows what changed, if anything
+# From repo root - check status
+make status          # Show what's built/missing
+make timing-report   # Show last build times
 
-# Complete rebuild (when changes detected)
-cd HPS/linux_image && sudo make clean && sudo make linux-image
+# Clean operations (parallel by default)
+make clean           # Clean artifacts, preserve caches
+make clean-all       # Deep clean including all caches
 
-# Force rebuilds (ignore incremental detection)
-sudo make rebuild   # Force kernel rebuild
-sudo make force-rebuild  # Alias for rebuild
+# Force rebuilds
+make everything FORCE_REBUILD=1  # Force full rebuild
 
-# Component rebuilds
-sudo make clean-kernel && sudo make kernel    # Kernel only
-sudo make clean-rootfs && sudo make rootfs    # Rootfs only
-sudo make clean-sd-image && sudo make sd-image # SD image only
+# Individual component rebuilds
+make fpga-clean && make fpga     # FPGA only
+make kernel FORCE_REBUILD=1      # Force kernel rebuild
+make rootfs clean-base           # Force rootfs base rebuild
+```
 
-# FPGA rebuild
-cd FPGA && make clean && make qsys-generate sof rbf
+### WSL-Specific Issues
+
+| Issue | Solution |
+|-------|----------|
+| **tar failed (debootstrap)** | Build on native Linux filesystem or increase WSL memory |
+| **Clock skew** | Run `sudo hwclock -s` |
+| **Slow builds** | Use WSL native fs (`~/`) not Windows fs (`/mnt/c/`) |
+| **Line endings** | Build system auto-normalizes (handled) |
+
+### Performance Tuning
+
+```bash
+# Low memory systems
+make everything PARALLEL_EVERYTHING=0 PARALLEL_BUILD=0
+
+# Maximum performance
+sudo apt install ccache
+make everything PARALLEL_JOBS=4
+
+# Skip FPGA rebuild (use existing artifacts)
+make sd-image  # Only checks for FPGA artifacts, doesn't rebuild
 ```
 
 ### Known Limitations
 - **SoC EDS 20.1**: Use prebuilt bootloaders (recommended workaround)
-- **Windows/WSL**: Path handling requires careful setup
-- **FPGA management**: Manual bitstream handling required
+- **WSL on /mnt/c/**: Slower and may have tar issues (use native fs when possible)
+- **First build**: No cache benefits, subsequent builds much faster

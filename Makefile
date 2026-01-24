@@ -170,11 +170,12 @@ endef
 # ============================================================================
 
 .PHONY: all help clean clean-all
-.PHONY: fpga fpga-qsys fpga-sof fpga-rbf fpga-dtb fpga-check
+.PHONY: fpga fpga-qsys fpga-sof fpga-rbf fpga-rbf-only fpga-dtb fpga-dtb-only fpga-check
 .PHONY: hps kernel rootfs applications
 .PHONY: sd-image sd-image-update
 .PHONY: deploy status timing-report check-deps
-.PHONY: everything everything-parallel
+.PHONY: everything everything-parallel everything-sequential
+.PHONY: task-fpga task-hps
 
 # ============================================================================
 # Default Target
@@ -198,11 +199,13 @@ help:
 	@echo "==================================================="
 	@echo ""
 	@echo "Main Targets:"
-	@echo "  all              - Build complete SD card image (default)"
-	@echo "  everything       - Build all components (FPGA + HPS + image)"
-	@echo "  status           - Show build status and artifact locations"
-	@echo "  timing-report    - Show build timing statistics"
-	@echo "  help             - Show this help message"
+	@echo "  all                  - Build complete SD card image (default)"
+	@echo "  everything           - Build all (FPGA + HPS in parallel)"
+	@echo "  everything-parallel  - Force parallel FPGA + HPS builds"
+	@echo "  everything-sequential- Force sequential builds"
+	@echo "  status               - Show build status and artifact locations"
+	@echo "  timing-report        - Show build timing statistics"
+	@echo "  help                 - Show this help message"
 	@echo ""
 	@echo "FPGA Targets:"
 	@echo "  fpga             - Build all FPGA components"
@@ -226,10 +229,16 @@ help:
 	@echo "  clean            - Clean build artifacts (keep caches)"
 	@echo "  clean-all        - Deep clean including all caches"
 	@echo ""
-	@echo "Configuration:"
-	@echo "  PARALLEL_BUILD=1/0  - Enable/disable parallel builds"
-	@echo "  PARALLEL_JOBS=N     - Number of parallel jobs"
+	@echo "Parallelization Options:"
+	@echo "  PARALLEL_EVERYTHING=1/0 - FPGA + HPS parallel (default: 1)"
+	@echo "  PARALLEL_BUILD=1/0      - Kernel + Rootfs parallel (default: 1)"
+	@echo "  PARALLEL_JOBS=N         - Jobs for kernel/rootfs (default: 2)"
+	@echo "  QUARTUS_PARALLEL_JOBS=N - Quartus compile jobs (default: auto)"
+	@echo "  PARALLEL_APPS=1/0       - Applications parallel (default: 1)"
+	@echo ""
+	@echo "Other Configuration:"
 	@echo "  CROSS_COMPILE=...   - Cross-compiler prefix"
+	@echo "  USE_CCACHE=1/0      - Enable ccache for kernel"
 	@echo ""
 	@echo "DTB Strategy: $(DTB_SOURCE)"
 	@echo "  Current: QSys-generated (Option A)"
@@ -331,8 +340,15 @@ timing-report:
 # ============================================================================
 # FPGA Build Targets
 # ============================================================================
+# 
+# Parallelization: After SOF is compiled, DTB and RBF generation can run
+# in parallel since they're independent operations.
+# ============================================================================
 
-fpga: fpga-rbf fpga-dtb
+fpga: fpga-sof
+	$(call log_header,FPGA Post-Compile (RBF + DTB in parallel))
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Generating RBF and DTB in parallel..."
+	@$(MAKE) -j2 fpga-rbf-only fpga-dtb-only
 	$(call log_ok,FPGA build complete)
 
 fpga-qsys:
@@ -343,10 +359,22 @@ fpga-qsys:
 
 fpga-sof: fpga-qsys
 	$(call log_header,FPGA Compilation (SOF))
+	$(call log_info,Quartus parallel jobs: $(NPROC))
 	$(call start_timer,fpga-compile)
 	@$(MAKE) -C $(FPGA_DIR) sof
 	$(call end_timer,fpga-compile)
 
+# RBF generation (called from fpga target, runs in parallel with DTB)
+fpga-rbf-only:
+	@$(MAKE) -C $(FPGA_DIR) rbf
+	$(call log_ok,RBF created: $(FPGA_RBF))
+
+# DTB generation (called from fpga target, runs in parallel with RBF)
+fpga-dtb-only:
+	@$(MAKE) -C $(FPGA_DIR) dtb
+	$(call log_ok,DTB created: $(FPGA_DTB))
+
+# Standalone targets (for manual use)
 fpga-rbf: fpga-sof
 	$(call log_header,FPGA RBF Generation)
 	@$(MAKE) -C $(FPGA_DIR) rbf
@@ -441,45 +469,111 @@ sd-image-update:
 	$(call end_timer,sd-image-update)
 
 # ============================================================================
-# Everything Target
+# Everything Target - Maximum Parallelization
+# ============================================================================
+# 
+# Build Parallelization Strategy:
+#   FPGA and HPS builds are largely independent until SD image creation.
+#   Running them in parallel can save 15-30 minutes on a full build.
+#
+#   Sequential (old):  FPGA -> Kernel -> Rootfs -> SD Image  (~60-90 min)
+#   Parallel (new):    [FPGA] -----> [SD Image]              (~35-50 min)
+#                      [Kernel + Rootfs] ->
+#
+# Configuration:
+#   PARALLEL_EVERYTHING=1 : Run FPGA and HPS builds in parallel (default)
+#   PARALLEL_EVERYTHING=0 : Run sequentially (for debugging/low memory)
 # ============================================================================
 
+PARALLEL_EVERYTHING ?= 1
+
+# Task wrappers for parallel execution
+task-fpga:
+	@echo -e "$(CYAN)[TASK]$(NC) $(TIMESTAMP) | Starting FPGA build task"
+	$(call start_timer,fpga-task)
+	@$(MAKE) --no-print-directory fpga
+	$(call end_timer,fpga-task)
+
+task-hps:
+	@echo -e "$(CYAN)[TASK]$(NC) $(TIMESTAMP) | Starting HPS build task (kernel + rootfs)"
+	$(call start_timer,hps-task)
+	@$(MAKE) -C $(HPS_DIR)/linux_image kernel rootfs \
+		PARALLEL_BUILD=$(PARALLEL_BUILD) \
+		PARALLEL_JOBS=$(PARALLEL_JOBS) \
+		CROSS_COMPILE=$(CROSS_COMPILE) \
+		ARCH=$(ARCH)
+	$(call end_timer,hps-task)
+
+# Default: parallel FPGA + HPS, then SD image
 everything: 
 	$(call log_header,Building Everything)
 	@rm -f $(TIMING_DIR)/build_times.csv
 	$(call start_timer,everything)
 	@echo ""
-	$(call log_step,Step 1/4: Building FPGA...)
-	@$(MAKE) --no-print-directory fpga
+	@if [ "$(PARALLEL_EVERYTHING)" = "1" ]; then \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | PARALLEL mode: FPGA and HPS building simultaneously"; \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Set PARALLEL_EVERYTHING=0 for sequential builds"; \
+		echo ""; \
+		$(MAKE) -j2 task-fpga task-hps; \
+	else \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | SEQUENTIAL mode: Building FPGA then HPS"; \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Set PARALLEL_EVERYTHING=1 for parallel builds"; \
+		echo ""; \
+		$(MAKE) --no-print-directory fpga; \
+		echo ""; \
+		$(MAKE) --no-print-directory kernel; \
+		$(MAKE) --no-print-directory rootfs; \
+	fi
 	@echo ""
-	$(call log_step,Step 2/4: Building Kernel...)
-	@$(MAKE) --no-print-directory kernel
-	@echo ""
-	$(call log_step,Step 3/4: Building Rootfs...)
-	@$(MAKE) --no-print-directory rootfs
-	@echo ""
-	$(call log_step,Step 4/4: Creating SD Image...)
+	$(call log_step,Final Step: Creating SD Image...)
+	$(call start_timer,sd-image-final)
 	@$(MAKE) -C $(HPS_DIR)/linux_image sd-image-internal
+	$(call end_timer,sd-image-final)
 	$(call end_timer,everything)
 	@echo ""
 	$(call log_header,Everything Built Successfully)
 	@$(MAKE) --no-print-directory timing-report
 
+# Explicit parallel build (same as everything with PARALLEL_EVERYTHING=1)
+everything-parallel:
+	@$(MAKE) everything PARALLEL_EVERYTHING=1
+
+# Explicit sequential build
+everything-sequential:
+	@$(MAKE) everything PARALLEL_EVERYTHING=0
+
 # ============================================================================
-# Clean Targets
+# Clean Targets (Parallelized)
+# ============================================================================
+# FPGA and HPS clean operations are independent and can run in parallel.
 # ============================================================================
 
-clean:
-	$(call log_header,Cleaning Build Artifacts)
+.PHONY: clean-fpga clean-hps clean-fpga-all clean-hps-all
+
+# Individual clean tasks for parallel execution
+clean-fpga:
 	@$(MAKE) -C $(FPGA_DIR) clean || true
+
+clean-hps:
 	@$(MAKE) -C $(HPS_DIR) clean || true
+
+clean-fpga-all:
+	@$(MAKE) -C $(FPGA_DIR) clean-all || true
+
+clean-hps-all:
+	@$(MAKE) -C $(HPS_DIR) clean-all || true
+	@$(MAKE) -C $(HPS_DIR)/linux_image/rootfs clean-all || true
+
+clean:
+	$(call log_header,Cleaning Build Artifacts (Parallel))
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Cleaning FPGA and HPS in parallel..."
+	@$(MAKE) -j2 clean-fpga clean-hps
 	@rm -f $(TIMING_DIR)/build_times.csv
 	$(call log_ok,Clean complete)
 
 clean-all:
-	$(call log_header,Deep Clean (Including Caches))
-	@$(MAKE) -C $(FPGA_DIR) clean-all || true
-	@$(MAKE) -C $(HPS_DIR) clean-all || true
-	@$(MAKE) -C $(HPS_DIR)/linux_image/rootfs clean-all || true
+	$(call log_header,Deep Clean Including Caches (Parallel))
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Deep cleaning FPGA and HPS in parallel..."
+	@$(MAKE) -j2 clean-fpga-all clean-hps-all
 	@rm -rf $(BUILD_DIR)
 	$(call log_ok,Deep clean complete)

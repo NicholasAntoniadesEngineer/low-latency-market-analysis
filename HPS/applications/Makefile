@@ -2,6 +2,7 @@
 # HPS Application Build System for DE10-Nano
 # ============================================================================
 # Builds user-space applications (calculator_test, led_examples)
+# Supports parallel builds for faster compilation
 # ============================================================================
 
 SHELL := /bin/bash
@@ -16,17 +17,49 @@ APPLICATIONS_DIR := $(CURDIR)
 HPS_DIR := $(abspath $(CURDIR)/..)
 REPO_ROOT := $(abspath $(HPS_DIR)/..)
 
+# Parallel build configuration
+# Set PARALLEL_APPS=1 to build applications in parallel (default)
+# Set PARALLEL_APPS=0 for sequential builds (debugging)
+PARALLEL_APPS ?= 1
+
 # Colors
 GREEN := \033[0;32m
 YELLOW := \033[1;33m
+CYAN := \033[0;36m
 NC := \033[0m
 
-.PHONY: all help clean calculator_test led_examples boot_led
+TIMESTAMP = $(shell date '+%Y-%m-%d %H:%M:%S')
 
-all: calculator_test boot_led
+.PHONY: all help clean calculator_test led_examples boot_led
+.PHONY: all-parallel all-sequential
+
+# Default: build applications (parallel or sequential based on config)
+all:
+	@if [ "$(PARALLEL_APPS)" = "1" ]; then \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building applications in PARALLEL"; \
+		$(MAKE) -j3 calculator_test boot_led led_examples 2>/dev/null || \
+		$(MAKE) -j2 calculator_test boot_led; \
+	else \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building applications SEQUENTIALLY"; \
+		$(MAKE) calculator_test; \
+		$(MAKE) boot_led; \
+	fi
 	@echo -e "$(GREEN)===========================================$(NC)"
 	@echo -e "$(GREEN)Applications build complete$(NC)"
 	@echo -e "$(GREEN)===========================================$(NC)"
+
+# Force parallel build
+all-parallel:
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building all applications in parallel"
+	@$(MAKE) -j3 calculator_test boot_led led_examples 2>/dev/null || \
+		$(MAKE) -j2 calculator_test boot_led
+
+# Force sequential build
+all-sequential:
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building all applications sequentially"
+	@$(MAKE) calculator_test
+	@$(MAKE) boot_led
+	@$(MAKE) led_examples
 
 help:
 	@echo "HPS Application Build System"

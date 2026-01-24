@@ -6,9 +6,44 @@
 #   - Incremental builds (only rebuilds when source files change)
 #   - Base image caching (dramatically speeds up repeated builds)
 #   - Layered architecture (base system + overlays)
+#   - WSL native filesystem building (avoids tar failures on /mnt/c/)
 # ============================================================================
 
 SHELL := /bin/bash
+
+# ============================================================================
+# WSL Native Filesystem Building
+# ============================================================================
+# WSL has known issues with debootstrap/tar on Windows filesystems (/mnt/c/).
+# This feature automatically builds in native Linux filesystem for reliability.
+#
+# Detection:
+#   - Checks if running on WSL AND path starts with /mnt/
+#   - If so, builds in WSL_BUILD_DIR (default: ~/de10-rootfs-build)
+#
+# Configuration:
+#   WSL_NATIVE_BUILD=1   : Force native filesystem build
+#   WSL_NATIVE_BUILD=0   : Disable (build in current directory)
+#   WSL_BUILD_DIR=path   : Custom native build directory
+# ============================================================================
+
+# Detect WSL and Windows filesystem
+IS_WSL := $(shell grep -qi microsoft /proc/version 2>/dev/null && echo 1 || echo 0)
+IS_WINDOWS_FS := $(shell echo "$(CURDIR)" | grep -q "^/mnt/" && echo 1 || echo 0)
+
+# Auto-enable native build if on WSL with Windows filesystem
+ifeq ($(IS_WSL),1)
+ifeq ($(IS_WINDOWS_FS),1)
+WSL_NATIVE_BUILD ?= 1
+else
+WSL_NATIVE_BUILD ?= 0
+endif
+else
+WSL_NATIVE_BUILD ?= 0
+endif
+
+# Native build directory (in WSL's native filesystem)
+WSL_BUILD_DIR ?= $(HOME)/de10-rootfs-build
 
 # Configuration
 BUILD_DIR := $(CURDIR)/build
@@ -59,6 +94,7 @@ TIMESTAMP = $(shell date '+%Y-%m-%d %H:%M:%S')
 
 .PHONY: all rootfs deps deps-check clean help rebuild force-rebuild check-rebuild
 .PHONY: base-image overlay-only show-cache-status clean-base
+.PHONY: rootfs-native rootfs-local wsl-status
 
 all: rootfs
 	@echo -e "$(GREEN)===========================================$(NC)"
@@ -72,12 +108,15 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  all           - Build rootfs if needed (default, uses caching)"
-	@echo "  rootfs        - Build rootfs tarball (with base caching)"
+	@echo "  rootfs        - Build rootfs tarball (auto-detects WSL)"
+	@echo "  rootfs-native - Force build on native Linux filesystem"
+	@echo "  rootfs-local  - Force build in current directory"
 	@echo "  base-image    - Build/cache base image only (debootstrap + packages)"
 	@echo "  overlay-only  - Apply overlays to cached base (fast rebuild)"
 	@echo "  rebuild       - Force rebuild everything from scratch"
 	@echo "  force-rebuild - Alias for rebuild"
 	@echo "  check-rebuild - Check if rebuild is needed (dry-run)"
+	@echo "  wsl-status    - Show WSL detection status"
 	@echo "  show-cache-status - Show base image cache status"
 	@echo "  deps          - Install build-host dependencies"
 	@echo "  deps-check    - Verify build-host dependencies"
@@ -108,11 +147,19 @@ help:
 	@echo "  SSH_ENABLED=yes|no"
 	@echo "  ROOT_PASSWORD=root"
 	@echo ""
+	@echo "WSL Configuration:"
+	@echo "  WSL_NATIVE_BUILD=1/0   - Force/disable native filesystem build"
+	@echo "  WSL_BUILD_DIR=path     - Custom native build directory"
+	@echo "  Current: WSL=$(IS_WSL), WindowsFS=$(IS_WINDOWS_FS), NativeBuild=$(WSL_NATIVE_BUILD)"
+	@echo ""
 	@echo "Examples:"
 	@echo "  make rootfs                    # Smart build with caching"
+	@echo "  make rootfs-native             # Force native filesystem build"
+	@echo "  make rootfs-local              # Force local build (no WSL redirect)"
 	@echo "  make overlay-only              # Fast: only apply configs"
 	@echo "  make rebuild                   # Full rebuild (slow)"
 	@echo "  make clean-base && make rootfs # Refresh base image"
+	@echo "  make wsl-status                # Check WSL detection"
 
 # Show cache status
 show-cache-status:
@@ -158,11 +205,89 @@ show-cache-status:
 		echo -e "Base cache: $(YELLOW)NOT AVAILABLE$(NC)"; \
 	fi
 
-rootfs: $(ROOTFS_TAR)
+# ============================================================================
+# WSL Status and Native Build Targets
+# ============================================================================
+
+wsl-status:
+	@echo "WSL Detection Status"
+	@echo "===================="
+	@echo "  IS_WSL:           $(IS_WSL)"
+	@echo "  IS_WINDOWS_FS:    $(IS_WINDOWS_FS)"
+	@echo "  WSL_NATIVE_BUILD: $(WSL_NATIVE_BUILD)"
+	@echo "  WSL_BUILD_DIR:    $(WSL_BUILD_DIR)"
+	@echo "  Current dir:      $(CURDIR)"
+	@echo ""
+	@if [ "$(IS_WSL)" = "1" ] && [ "$(IS_WINDOWS_FS)" = "1" ]; then \
+		echo -e "$(YELLOW)WARNING: Building on Windows filesystem (/mnt/c/)$(NC)"; \
+		echo -e "$(YELLOW)         debootstrap may fail with 'tar' errors$(NC)"; \
+		echo -e "$(GREEN)RECOMMENDED: Use 'make rootfs' (auto-redirects to native fs)$(NC)"; \
+	elif [ "$(IS_WSL)" = "1" ]; then \
+		echo -e "$(GREEN)Building on native Linux filesystem - optimal$(NC)"; \
+	else \
+		echo -e "$(GREEN)Not running on WSL - native Linux$(NC)"; \
+	fi
+
+# Force build on native filesystem (WSL)
+rootfs-native:
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building rootfs on native Linux filesystem"
+	@$(MAKE) rootfs-native-internal
+
+rootfs-native-internal:
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Setting up native build environment..."
+	@mkdir -p $(WSL_BUILD_DIR)
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Build directory: $(WSL_BUILD_DIR)"
+	@# Copy necessary files to native filesystem
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Copying build files..."
+	@cp -f $(BUILD_SCRIPT) $(WSL_BUILD_DIR)/
+	@cp -f $(CURDIR)/packages.txt $(WSL_BUILD_DIR)/ 2>/dev/null || true
+	@cp -rf $(CURDIR)/configs $(WSL_BUILD_DIR)/ 2>/dev/null || true
+	@cp -rf $(CURDIR)/scripts $(WSL_BUILD_DIR)/ 2>/dev/null || true
+	@# Create a minimal Makefile for the native build
+	@echo 'SHELL := /bin/bash' > $(WSL_BUILD_DIR)/Makefile.native
+	@echo 'BUILD_DIR := $(WSL_BUILD_DIR)/build' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo 'ROOTFS_DIR := $$(BUILD_DIR)/rootfs' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo 'ROOTFS_TAR := $$(BUILD_DIR)/rootfs.tar.gz' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '.PHONY: build' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo 'build:' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '	@mkdir -p $$(BUILD_DIR)' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '	@export ROOTFS_DIR="$$(ROOTFS_DIR)" ROOTFS_TAR="$$(ROOTFS_TAR)" && bash ./build_rootfs.sh' >> $(WSL_BUILD_DIR)/Makefile.native
+	@# Run build on native filesystem
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Running build on native filesystem..."
+	@cd $(WSL_BUILD_DIR) && sudo make -f Makefile.native build
+	@# Copy results back
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Copying results back to project..."
+	@mkdir -p $(BUILD_DIR)
+	@cp -f $(WSL_BUILD_DIR)/build/rootfs.tar.gz $(ROOTFS_TAR)
+	@if [ -f "$(WSL_BUILD_DIR)/build/rootfs_base.tar.gz" ]; then \
+		cp -f $(WSL_BUILD_DIR)/build/rootfs_base.tar.gz $(ROOTFS_BASE_TAR); \
+	fi
+	@echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Rootfs built on native filesystem and copied back"
+	@echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Result: $(ROOTFS_TAR)"
+
+# Force build in current directory (no WSL redirect)
+rootfs-local: rootfs-local-internal
+	@echo -e "$(GREEN)Rootfs built locally$(NC)"
+
+rootfs-local-internal: deps-check $(ROOTFS_BASE_TAR) $(OVERLAY_SOURCES)
+	@$(MAKE) rootfs-build-internal
+
+# Main rootfs target - auto-detects WSL and redirects if needed
+rootfs:
+	@if [ "$(WSL_NATIVE_BUILD)" = "1" ]; then \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | WSL detected with Windows filesystem"; \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Redirecting build to native filesystem: $(WSL_BUILD_DIR)"; \
+		$(MAKE) rootfs-native; \
+	else \
+		$(MAKE) rootfs-local-internal; \
+	fi
 	@echo -e "$(GREEN)Rootfs built successfully$(NC)"
 
-# Main build target - uses caching
+# Internal build target - actual rootfs creation
 $(ROOTFS_TAR): deps-check $(ROOTFS_BASE_TAR) $(OVERLAY_SOURCES)
+	@$(MAKE) rootfs-build-internal
+
+rootfs-build-internal:
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building final rootfs with overlays..."
 	@# Check if we can use cached base
 	@if [ -f "$(ROOTFS_BASE_TAR)" ]; then \
@@ -342,23 +467,6 @@ deps-check:
 		fi; \
 		echo "All build-host dependencies satisfied"; \
 	'
-
-# Check if rebuild is needed by comparing timestamps
-check-rebuild:
-	@if [ ! -f "$(ROOTFS_TAR)" ]; then \
-		echo -e "$(YELLOW)Rebuild needed: rootfs.tar.gz does not exist$(NC)"; \
-		exit 0; \
-	fi; \
-	needs_rebuild=0; \
-	for src in $(ROOTFS_SOURCES); do \
-		if [ -f "$$src" ] && [ "$$src" -nt "$(ROOTFS_TAR)" ]; then \
-			echo -e "$(YELLOW)Rebuild needed: $$src is newer than rootfs.tar.gz$(NC)"; \
-			needs_rebuild=1; \
-		fi; \
-	done; \
-	if [ $$needs_rebuild -eq 0 ]; then \
-		echo -e "$(GREEN)No rebuild needed: rootfs.tar.gz is up-to-date$(NC)"; \
-	fi
 
 # Force rebuild - always rebuilds from scratch (including base)
 rebuild: clean-all

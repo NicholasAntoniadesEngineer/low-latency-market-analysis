@@ -2,12 +2,31 @@
 
 Complete hardware-software platform for low-latency FPGA-accelerated computing on the Terasic DE10-Nano SoC board.
 
-## Quick Workflow
+## Quick Start
 
-1. **Build FPGA Hardware** → Generate bitstream for calculator IP
-2. **Build HPS Software** → Compile Linux kernel and applications
-3. **Create Boot Image** → Assemble SD card with FPGA + Linux
-4. **Deploy & Run** → Flash to DE10-Nano and execute tests
+```bash
+# From repository root - build everything with parallelization
+make everything    # FPGA + HPS build in parallel, then creates SD image
+
+# Or build individual components
+make fpga          # Build FPGA bitstream only
+make kernel        # Build Linux kernel only
+make rootfs        # Build root filesystem only
+make sd-image      # Create SD card image (requires FPGA artifacts)
+```
+
+## Build System Features
+
+| Feature | Description | Configuration |
+|---------|-------------|---------------|
+| **Parallel FPGA+HPS** | FPGA and HPS build simultaneously | `PARALLEL_EVERYTHING=1` |
+| **Parallel Kernel+Rootfs** | Kernel and rootfs build simultaneously | `PARALLEL_BUILD=1` |
+| **Quartus Parallelization** | Multi-core FPGA compilation | `QUARTUS_PARALLEL_JOBS=auto` |
+| **ccache Support** | Faster kernel rebuilds | `USE_CCACHE=1` |
+| **Tool Caching** | Cache Quartus/QSys paths | 60-minute cache |
+| **Rootfs Base Caching** | Cache debootstrap base image | Rebuild only when packages.txt changes |
+| **Build Timing** | Profile all build phases | `make timing-report` |
+| **Incremental Updates** | Update existing SD images | `make sd-image-update` |
 
 ---
 
@@ -16,55 +35,65 @@ Complete hardware-software platform for low-latency FPGA-accelerated computing o
 - **Hardware**: DE10-Nano board + MicroSD card (8GB+)
 - **Software**: Quartus Prime Lite 20.1 + ARM cross-compiler
 - **OS**: Windows with WSL2 or Linux environment
-- **Optional**: DE10-Nano System CD (for prebuilt bootloaders)
+- **Optional**: DE10-Nano System CD (for prebuilt bootloaders), ccache
 
----
-
-## 1. FPGA Build Process
-
-**Location**: `FPGA/` directory
-
-### Generate Hardware Design
+### Install Dependencies
 ```bash
-cd FPGA
-make qsys-generate    # Create QSys system (calculator IP + bridges)
-make sof             # Synthesize FPGA design (~5-15 min)
-make rbf             # Convert to RBF format for Linux
+make deps          # Install all build dependencies
+sudo apt install ccache  # Optional: faster kernel rebuilds
 ```
 
-**Output**: `build/output_files/DE10_NANO_SoC_GHRD.rbf`
-
-### What Gets Built
-- **Calculator IP**: Hardware-accelerated floating-point operations
-- **HPS-FPGA Bridges**: Lightweight (LW) and heavyweight (HW) bridges
-- **Device Tree**: Hardware description for Linux kernel
-- **Bitstream**: Programmable FPGA configuration
-
 ---
 
-## 2. HPS Build Process
+## Build Commands
 
-**Location**: `HPS/` directory
-
-### Build Linux System
+### Full Build (Recommended)
 ```bash
-cd HPS/linux_image
-sudo make kernel     # Cross-compile Linux kernel with FPGA drivers
-sudo make rootfs     # Build Debian rootfs with SSH/networking
-sudo make sd-image   # Combine kernel + rootfs + FPGA bitstream
+make everything          # Parallel FPGA + HPS build (~35-50 min)
+make everything-parallel  # Force parallel mode
+make everything-sequential # Force sequential mode (low memory)
 ```
 
-**Output**: `build/de10-nano-custom.img` (~4GB bootable image)
+### FPGA Build
+```bash
+make fpga              # Complete FPGA build (QSys + Quartus + RBF + DTB)
+make fpga-qsys         # Generate QSys system only
+make fpga-sof          # Compile FPGA bitstream
+make fpga-rbf          # Convert to RBF format
+make fpga-dtb          # Generate device tree from QSys
+```
 
-### What Gets Built
-- **Custom Linux Kernel**: SoC FPGA kernel with FPGA bridge drivers
-- **Debian Rootfs**: ARMhf Debian with SSH, networking, development tools
-- **Calculator Application**: Test suite for HPS-FPGA communication
-- **Bootloaders**: Preloader + U-Boot (from DE10-Nano System CD)
+### HPS Build
+```bash
+make kernel            # Build Linux kernel (with ccache if available)
+make rootfs            # Build root filesystem (uses base cache)
+make applications      # Build HPS applications
+make sd-image          # Create complete SD card image
+make sd-image-update   # Incremental update (faster)
+```
+
+### Status and Diagnostics
+```bash
+make help              # Show all available targets
+make status            # Show build artifact status
+make timing-report     # Show build timing statistics
+```
 
 ---
 
-## 3. Deploy to DE10-Nano
+## Build Outputs
+
+| Component | Output Location | Build Time |
+|-----------|-----------------|------------|
+| FPGA RBF | `FPGA/build/output_files/DE10_NANO_SoC_GHRD.rbf` | 15-25 min |
+| Device Tree | `FPGA/generated/soc_system.dtb` | 1 min |
+| Kernel | `HPS/linux_image/kernel/build/arch/arm/boot/zImage` | 10-20 min |
+| Rootfs | `HPS/linux_image/rootfs/build/rootfs.tar.gz` | 15-25 min |
+| SD Image | `HPS/linux_image/build/de10-nano-custom.img` | 2-5 min |
+
+---
+
+## Deploy to DE10-Nano
 
 ### Flash SD Card
 ```bash
@@ -77,45 +106,19 @@ sudo dd if=HPS/linux_image/build/de10-nano-custom.img of=/dev/sdX bs=4M status=p
 
 **Windows**: Use balenaEtcher, Win32DiskImager, or Rufus
 
-### Boot Sequence
-1. Insert SD card into DE10-Nano
-2. Power on board (LEDs will cycle during boot)
-3. Wait 30-60 seconds for Linux to initialize
-4. FPGA bitstream loads automatically
-5. SSH server starts (IP assigned via DHCP)
-
----
-
-## 4. Run & Test
-
-### Connect to Board
+### Boot & Connect
 ```bash
-# Find board IP (check router DHCP table)
-# Or use network scanner: nmap -sn 192.168.1.0/24
-
-# SSH connect (password: root)
+# SSH connect (default password: root)
 ssh root@<board-ip>
+
+# Run calculator tests
+./calculator_test
 ```
 
-### Execute Tests
+### Verify System
 ```bash
-# Run calculator test suite (30 tests)
-cd /root && ./calculator_test
-
-# Expected: All tests pass with HPS-FPGA communication
-# Watch LEDs change during calculations
-```
-
-### System Verification
-```bash
-# Check FPGA status
 cat /sys/class/fpga_manager/fpga0/state  # Should show "operating"
-
-# Check bridges
 cat /sys/class/fpga_bridge/*/state       # Should show "enabled"
-
-# Check network
-ip addr show eth0 && ping -c 3 8.8.8.8
 ```
 
 ---
@@ -123,30 +126,64 @@ ip addr show eth0 && ping -c 3 8.8.8.8
 ## Project Structure
 
 ```
-FPGA/                 # Quartus FPGA design (calculator IP, QSys system)
-├── qsys/            # QSys Platform Designer files
-├── hdl/             # Verilog/VHDL source files
-├── ip/              # Custom IP cores (calculator)
-└── Makefile         # FPGA build targets
+Makefile              # Top-level orchestration (recommended entry point)
+build/                # Common build infrastructure
+├── build_common.mk   # Shared macros, timing, logging
 
-HPS/                  # Hard Processor System (Linux + apps)
-├── linux_image/     # Linux kernel, rootfs, SD image build
-├── applications/    # HPS applications (calculator_test, LEDs)
-└── drivers/         # Linux driver integration
+FPGA/                 # Quartus FPGA design
+├── Makefile          # FPGA build (QSys, Quartus, DTB)
+├── qsys/             # QSys Platform Designer files
+├── hdl/              # Verilog/VHDL source files
+└── ip/               # Custom IP cores (calculator)
+
+HPS/                  # Hard Processor System
+├── Makefile          # HPS orchestration
+├── linux_image/      # Linux build system
+│   ├── Makefile      # Kernel + rootfs + SD image
+│   ├── kernel/       # Kernel build with ccache support
+│   └── rootfs/       # Rootfs build with base caching
+├── applications/     # HPS applications (parallel build)
+└── drivers/          # Linux driver integration
 
 documentation/        # Build guides and references
-examples/            # FPGA-HPS communication examples
+```
+
+---
+
+## Configuration
+
+### Parallelization Options
+```bash
+PARALLEL_EVERYTHING=1/0  # FPGA + HPS parallel (default: 1)
+PARALLEL_BUILD=1/0       # Kernel + Rootfs parallel (default: 1)
+PARALLEL_JOBS=N          # Parallel job count (default: 2)
+QUARTUS_PARALLEL_JOBS=N  # Quartus jobs (default: auto-detect CPU count)
+PARALLEL_APPS=1/0        # Applications parallel (default: 1)
+```
+
+### Performance Options
+```bash
+USE_CCACHE=1/0           # Enable ccache for kernel (default: 1 if available)
+TOOL_CACHE_DISABLE=1     # Disable Quartus/QSys path caching
+```
+
+### Clean Operations
+```bash
+make clean               # Clean build artifacts (parallel, preserves caches)
+make clean-all           # Deep clean including all caches
 ```
 
 ---
 
 ## Key Features
 
+- **Parallel Build System**: FPGA and HPS build simultaneously
+- **Intelligent Caching**: Tool paths, rootfs base, ccache for kernel
+- **Build Profiling**: Timing reports for all build phases
+- **Incremental Updates**: Only rebuild changed components
 - **Hardware Acceleration**: FPGA-based floating-point calculator IP
 - **Low-Latency Communication**: Direct HPS-FPGA memory-mapped I/O
-- **Automated Build System**: Makefiles handle complete toolchain
-- **Cross-Platform Development**: Windows/WSL/Linux compatibility
-- **Production Ready**: SSH-enabled Debian with networking
+- **Cross-Platform**: Windows/WSL/Linux compatibility
 
 ---
 
