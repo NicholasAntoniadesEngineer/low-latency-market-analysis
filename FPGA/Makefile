@@ -969,7 +969,9 @@ $(QUARTUS_STAMP): $(QUARTUS_DEPS)
 	@$(ECHO) "Compiling Quartus project: $(notdir $(QUARTUS_QPF))"
 	@$(ECHO) "Using Quartus: $(QUARTUS_SH_CMD)"
 	@$(ECHO) "Parallel jobs: $(QUARTUS_PARALLEL_JOBS) (set QUARTUS_PARALLEL_JOBS to override)"
-	cd $(QUARTUS_DIR) && $(QUARTUS_SH_CMD) --flow compile $(notdir $(QUARTUS_QPF)) -j$(QUARTUS_PARALLEL_JOBS)
+	@# quartus_sh does not accept -j; parallelism is controlled via Quartus settings/environment.
+	@# We still export NUM_PARALLEL_PROCESSORS above for tools that honor it.
+	cd $(QUARTUS_DIR) && $(QUARTUS_SH_CMD) --flow compile $(notdir $(QUARTUS_QPF))
 	@$(ECHO) "Checking for pin assignment TCL files to apply after map..."
 	@if [ -f "$(GENERATED_DIR)/$(QSYS_BASE)/synthesis/submodules/hps_sdram_p0_pin_assignments.tcl" ] || \
 	   [ -f "$(QSYS_DIR)/$(QSYS_BASE)/synthesis/submodules/hps_sdram_p0_pin_assignments.tcl" ] || \
