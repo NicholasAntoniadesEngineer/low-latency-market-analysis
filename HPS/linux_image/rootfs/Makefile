@@ -96,7 +96,7 @@ TIMESTAMP = $(shell date '+%Y-%m-%d %H:%M:%S')
 .PHONY: base-image overlay-only show-cache-status clean-base
 .PHONY: rootfs-native rootfs-local wsl-status extract-rootfs compress-rootfs
 
-all: rootfs
+all: $(ROOTFS_TAR)
 	@echo -e "$(GREEN)===========================================$(NC)"
 	@echo -e "$(GREEN)Rootfs build complete$(NC)"
 	@echo -e "$(GREEN)===========================================$(NC)"
@@ -107,12 +107,12 @@ help:
 	@echo "============================"
 	@echo ""
 	@echo "Targets:"
-	@echo "  all           - Build rootfs if needed (default, uses caching)"
-	@echo "  rootfs        - Build rootfs tarball (auto-detects WSL)"
-	@echo "  rootfs-native - Force build on native Linux filesystem"
-	@echo "  rootfs-local  - Force build in current directory"
+	@echo "  all           - Build rootfs if needed (default, automatic dependency tracking)"
+	@echo "  rootfs        - Build rootfs tarball (auto-detects WSL, incremental builds)"
+	@echo "  rootfs-native - Force build on native Linux filesystem (WSL)"
+	@echo "  rootfs-local  - Force build in current directory (no WSL redirect)"
 	@echo "  base-image    - Build/cache base image only (debootstrap + packages)"
-	@echo "  overlay-only  - Apply overlays to cached base (fast rebuild)"
+	@echo "  overlay-only  - Force overlay rebuild (redundant - make rootfs handles this)"
 	@echo "  rebuild       - Force rebuild everything from scratch"
 	@echo "  force-rebuild - Alias for rebuild"
 	@echo "  check-rebuild - Check if rebuild is needed (dry-run)"
@@ -120,8 +120,10 @@ help:
 	@echo "  show-cache-status - Show base image cache status"
 	@echo "  deps          - Install build-host dependencies"
 	@echo "  deps-check    - Verify build-host dependencies"
-	@echo "  clean         - Clean final rootfs only (keeps base cache)"
-	@echo "  clean-base    - Clean base image cache (next build will be slow)"
+	@echo "  clean         - Clean everything (fresh build, removes base cache)"
+	@echo "  clean-base    - Clean base image cache only (rarely needed)"
+	@echo "  extract-rootfs - Extract tarball for manual inspection/modification"
+	@echo "  compress-rootfs - Compress modified rootfs directory back to tarball"
 	@echo "  help          - Show this help message"
 	@echo ""
 	@echo "Caching System:"
@@ -137,8 +139,9 @@ help:
 	@echo "    - scripts/*.sh"
 	@echo "    - HPS applications"
 	@echo ""
-	@echo "  Base is rebuilt only when packages.txt changes."
-	@echo "  Overlays are always applied fresh."
+	@echo "  Base is rebuilt automatically when packages.txt changes."
+	@echo "  Overlays are rebuilt automatically when configs/scripts change."
+	@echo "  No manual cleanup needed - dependency tracking handles everything."
 	@echo ""
 	@echo "Configuration:"
 	@echo "  NETWORK_MODE=dhcp|static"
@@ -153,13 +156,16 @@ help:
 	@echo "  Current: WSL=$(IS_WSL), WindowsFS=$(IS_WINDOWS_FS), NativeBuild=$(WSL_NATIVE_BUILD)"
 	@echo ""
 	@echo "Examples:"
-	@echo "  make rootfs                    # Smart build with caching"
-	@echo "  make rootfs-native             # Force native filesystem build"
+	@echo "  make rootfs                    # Smart build with automatic dependency tracking"
+	@echo "  make rootfs-native             # Force native filesystem build (WSL)"
 	@echo "  make rootfs-local              # Force local build (no WSL redirect)"
-	@echo "  make overlay-only              # Fast: only apply configs"
-	@echo "  make rebuild                   # Full rebuild (slow)"
-	@echo "  make clean-base && make rootfs # Refresh base image"
-	@echo "  make wsl-status                # Check WSL detection"
+	@echo "  make overlay-only              # Force overlay rebuild (redundant - make rootfs does this)"
+	@echo "  make rebuild                   # Full rebuild from scratch (slow)"
+	@echo "  make clean                     # Clean everything for fresh build"
+	@echo "  make check-rebuild            # Check what needs rebuilding (dry-run)"
+	@echo "  make wsl-status                # Check WSL detection status"
+	@echo "  make extract-rootfs            # Extract tarball for manual inspection/modification"
+	@echo "  make compress-rootfs           # Compress modified rootfs directory back to tarball"
 
 # Show cache status
 show-cache-status:
@@ -323,8 +329,10 @@ rootfs-local: rootfs-local-internal
 rootfs-local-internal: deps-check $(ROOTFS_BASE_TAR) $(OVERLAY_SOURCES)
 	@$(MAKE) rootfs-build-internal
 
-# Main rootfs target - auto-detects WSL and redirects if needed
-rootfs:
+# Main rootfs target - depends on the actual file
+# Make will automatically skip if ROOTFS_TAR is up-to-date
+rootfs: $(ROOTFS_TAR)
+	@echo -e "$(GREEN)Rootfs ready: $(ROOTFS_TAR)$(NC)"
 	@set -e; \
 	if [ "$$(id -u)" -ne 0 ]; then \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Validating sudo access..."; \
@@ -342,11 +350,29 @@ rootfs:
 	else \
 		$(MAKE) rootfs-local-internal; \
 	fi
-	@echo -e "$(GREEN)Rootfs built successfully$(NC)"
 
 # Internal build target - actual rootfs creation
+# Make will automatically skip this if ROOTFS_TAR is newer than all dependencies
 $(ROOTFS_TAR): deps-check $(ROOTFS_BASE_TAR) $(OVERLAY_SOURCES)
-	@$(MAKE) rootfs-build-internal
+	@# Make's dependency system automatically skips this if ROOTFS_TAR is newer than dependencies
+	@# We need to handle WSL detection and build
+	@set -e; \
+	if [ "$$(id -u)" -ne 0 ]; then \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Validating sudo access..."; \
+		if ! sudo -n true 2>/dev/null; then \
+			echo -e "$(YELLOW)Rootfs build requires sudo privileges.$(NC)"; \
+			echo -e "$(YELLOW)Please enter your password (will be cached for this build):$(NC)"; \
+			sudo -v || (echo -e "$(RED)ERROR: Sudo authentication failed$(NC)" && exit 1); \
+		fi; \
+		sudo -v; \
+	fi; \
+	if [ "$(WSL_NATIVE_BUILD)" = "1" ]; then \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | WSL detected with Windows filesystem"; \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Redirecting build to native filesystem: $(WSL_BUILD_DIR)"; \
+		$(MAKE) rootfs-native; \
+	else \
+		$(MAKE) rootfs-build-internal; \
+	fi
 
 rootfs-build-internal:
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building final rootfs with overlays..."
@@ -391,6 +417,7 @@ $(ROOTFS_BASE_TAR): deps-check $(BASE_SOURCES)
 		if [ "$$current_hash" = "$$cached_hash" ]; then \
 			echo -e "$(GREEN)[CACHE VALID]$(NC) Base image is up-to-date"; \
 			echo "  Skipping debootstrap (use 'make clean-base' to force rebuild)"; \
+			touch "$(ROOTFS_BASE_TAR)" 2>/dev/null || true; \
 			exit 0; \
 		else \
 			echo -e "$(YELLOW)[CACHE STALE]$(NC) packages.txt changed - rebuilding base"; \
@@ -575,31 +602,37 @@ check-rebuild:
 		echo -e "$(GREEN)RESULT: No rebuild needed - rootfs is up-to-date$(NC)"; \
 	fi
 
-# Clean only final rootfs (keeps base cache for fast rebuilds)
+# Clean rootfs and old build files (fresh build)
+# Note: Normal 'make rootfs' handles incremental builds automatically via dependency tracking
+# Use 'make clean' only when you want a completely fresh build
 clean:
-	@echo -e "$(YELLOW)Cleaning rootfs (keeping base cache)...$(NC)"
+	@echo -e "$(YELLOW)Cleaning rootfs (fresh build)...$(NC)"
 	@# Unmount any mounted filesystems
 	@for mp in $(ROOTFS_DIR)/proc $(ROOTFS_DIR)/sys $(ROOTFS_DIR)/dev; do \
 		mountpoint -q "$$mp" 2>/dev/null && umount "$$mp" 2>/dev/null || true; \
 	done
 	@rm -rf $(ROOTFS_DIR)
 	@rm -f $(ROOTFS_TAR)
-	@echo -e "$(GREEN)Clean complete (base cache preserved)$(NC)"
-	@if [ -f "$(ROOTFS_BASE_TAR)" ]; then \
-		echo -e "$(GREEN)Base cache: $(ROOTFS_BASE_TAR)$(NC)"; \
-		echo -e "$(YELLOW)Next 'make rootfs' will be fast (~1-2 min)$(NC)"; \
-	fi
+	@# Remove old .tar.gz files (no longer used, replaced by .tar.xz)
+	@rm -f $(BUILD_DIR)/rootfs.tar.gz $(BUILD_DIR)/rootfs_base.tar.gz
+	@# Clean base cache for truly fresh build
+	@$(MAKE) clean-base
+	@echo -e "$(GREEN)Clean complete (fresh build on next 'make rootfs')$(NC)"
+	@echo -e "$(YELLOW)Next 'make rootfs' will do full build (~15-20 min)$(NC)"
+	@echo -e "$(CYAN)Note: Normal 'make rootfs' automatically handles incremental builds$(NC)"
 
 # Clean base image cache (forces full rebuild)
 clean-base:
 	@echo -e "$(YELLOW)Cleaning base image cache...$(NC)"
 	@rm -f $(ROOTFS_BASE_TAR)
 	@rm -f $(ROOTFS_BASE_HASH)
+	@# Remove old .tar.gz base files if they exist
+	@rm -f $(BUILD_DIR)/rootfs_base.tar.gz
 	@echo -e "$(GREEN)Base cache cleared$(NC)"
 	@echo -e "$(YELLOW)Next 'make rootfs' will do full build (~15-20 min)$(NC)"
 
-# Clean everything including base cache
-clean-all: clean clean-base
+# Clean everything (clean already includes base cache)
+clean-all: clean
 	@echo -e "$(GREEN)All rootfs artifacts cleaned$(NC)"
 
 # Extract rootfs tarball to directory (for use in SD image creation)
