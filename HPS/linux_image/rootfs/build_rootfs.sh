@@ -906,10 +906,10 @@ create_rootfs_tarball() {
         rm -f "$ROOTFS_DIR/usr/bin/qemu-arm-static"
     fi
     
-    # Create tarball
+    # Create tarball with xz compression
     mkdir -p "$(dirname "$ROOTFS_TAR")"
     cd "$ROOTFS_DIR"
-    tar -czf "$ROOTFS_TAR" .
+    tar -cJf "$ROOTFS_TAR" .
     cd - > /dev/null
     
     # Calculate size
