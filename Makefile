@@ -80,8 +80,8 @@ UBOOT_IMG := $(HPS_DIR)/preloader/uboot-socfpga/u-boot.img
 
 # HPS Artifacts
 KERNEL_ZIMAGE := $(HPS_DIR)/linux_image/kernel/build/arch/arm/boot/zImage
-ROOTFS_TAR := $(HPS_DIR)/linux_image/rootfs/build/rootfs.tar.gz
-ROOTFS_BASE_TAR := $(HPS_DIR)/linux_image/rootfs/build/rootfs_base.tar.gz
+ROOTFS_TAR := $(HPS_DIR)/linux_image/rootfs/build/rootfs.tar.xz
+ROOTFS_BASE_TAR := $(HPS_DIR)/linux_image/rootfs/build/rootfs_base.tar.xz
 
 # Final Output
 SD_IMAGE := $(HPS_DIR)/linux_image/build/de10-nano-custom.img

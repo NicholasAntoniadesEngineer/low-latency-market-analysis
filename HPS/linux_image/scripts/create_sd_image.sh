@@ -36,7 +36,7 @@ KERNEL_IMAGE="${KERNEL_IMAGE:-$KERNEL_DIR/build/arch/arm/boot/zImage}"
 KERNEL_DTB="${KERNEL_DTB:-$KERNEL_DIR/build/arch/arm/boot/dts/socfpga_cyclone5_de10_nano.dtb}"
 FPGA_DTB="${FPGA_DTB:-$FPGA_DIR/generated/soc_system.dtb}"
 FPGA_RBF="${FPGA_RBF:-}"
-ROOTFS_TAR="${ROOTFS_TAR:-$ROOTFS_DIR/build/rootfs.tar.gz}"
+ROOTFS_TAR="${ROOTFS_TAR:-$ROOTFS_DIR/build/rootfs.tar.xz}"
 
 # ============================================================================
 # Device Tree Strategy (Option A: QSys-Generated)
@@ -637,7 +637,7 @@ extract_rootfs() {
     mount "$ROOTFS_DEVICE" "$MOUNT_POINT"
     
     print_step "Extracting rootfs tarball..."
-    tar -xzf "$ROOTFS_TAR" -C "$MOUNT_POINT"
+    tar -xJf "$ROOTFS_TAR" -C "$MOUNT_POINT"
     
     print_step "Unmounting rootfs partition..."
     umount "$MOUNT_POINT"

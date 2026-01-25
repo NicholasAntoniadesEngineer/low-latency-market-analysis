@@ -48,7 +48,7 @@ WSL_BUILD_DIR ?= $(HOME)/de10-rootfs-build
 # Configuration
 BUILD_DIR := $(CURDIR)/build
 ROOTFS_DIR := $(BUILD_DIR)/rootfs
-ROOTFS_TAR := $(BUILD_DIR)/rootfs.tar.gz
+ROOTFS_TAR := $(BUILD_DIR)/rootfs.tar.xz
 BUILD_SCRIPT := $(CURDIR)/build_rootfs.sh
 DEPS_PACKAGES := debootstrap qemu-user-static debian-archive-keyring ca-certificates gnupg wget
 
@@ -69,7 +69,7 @@ DEPS_PACKAGES := debootstrap qemu-user-static debian-archive-keyring ca-certific
 #   - Very fast to apply (<2 min)
 # ============================================================================
 
-ROOTFS_BASE_TAR := $(BUILD_DIR)/rootfs_base.tar.gz
+ROOTFS_BASE_TAR := $(BUILD_DIR)/rootfs_base.tar.xz
 ROOTFS_BASE_HASH := $(BUILD_DIR)/.rootfs_base_hash
 
 # Sources that trigger BASE rebuild (slow operations)
@@ -94,7 +94,7 @@ TIMESTAMP = $(shell date '+%Y-%m-%d %H:%M:%S')
 
 .PHONY: all rootfs deps deps-check clean help rebuild force-rebuild check-rebuild
 .PHONY: base-image overlay-only show-cache-status clean-base
-.PHONY: rootfs-native rootfs-local wsl-status
+.PHONY: rootfs-native rootfs-local wsl-status extract-rootfs compress-rootfs
 
 all: rootfs
 	@echo -e "$(GREEN)===========================================$(NC)"
@@ -240,7 +240,7 @@ rootfs-native-internal:
 	@mkdir -p $(WSL_BUILD_DIR)
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Build directory: $(WSL_BUILD_DIR)"
 	@# Check base cache validity and copy if available
-	@WSL_BASE_TAR="$(WSL_BUILD_DIR)/build/rootfs_base.tar.gz"; \
+	@WSL_BASE_TAR="$(WSL_BUILD_DIR)/build/rootfs_base.tar.xz"; \
 	WSL_BASE_HASH="$(WSL_BUILD_DIR)/build/.rootfs_base_hash"; \
 	current_hash=$$(md5sum $(BASE_SOURCES) 2>/dev/null | md5sum | cut -d' ' -f1); \
 	if [ -f "$(ROOTFS_BASE_TAR)" ] && [ -f "$(ROOTFS_BASE_HASH)" ]; then \
@@ -266,8 +266,8 @@ rootfs-native-internal:
 	@echo 'SHELL := /bin/bash' > $(WSL_BUILD_DIR)/Makefile.native
 	@echo 'BUILD_DIR := $(WSL_BUILD_DIR)/build' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo 'ROOTFS_DIR := $$(BUILD_DIR)/rootfs' >> $(WSL_BUILD_DIR)/Makefile.native
-	@echo 'ROOTFS_TAR := $$(BUILD_DIR)/rootfs.tar.gz' >> $(WSL_BUILD_DIR)/Makefile.native
-	@echo 'ROOTFS_BASE_TAR := $$(BUILD_DIR)/rootfs_base.tar.gz' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo 'ROOTFS_TAR := $$(BUILD_DIR)/rootfs.tar.xz' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo 'ROOTFS_BASE_TAR := $$(BUILD_DIR)/rootfs_base.tar.xz' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo 'ROOTFS_BASE_HASH := $$(BUILD_DIR)/.rootfs_base_hash' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo 'BASE_SOURCES := packages.txt' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo '.PHONY: build base-image' >> $(WSL_BUILD_DIR)/Makefile.native
@@ -276,12 +276,12 @@ rootfs-native-internal:
 	@echo '	@if [ -f "$$(ROOTFS_BASE_TAR)" ]; then \' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo '		echo "[CACHE HIT] Using cached base image"; \' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo '		mkdir -p $$(ROOTFS_DIR); \' >> $(WSL_BUILD_DIR)/Makefile.native
-	@echo '		tar -xzf $$(ROOTFS_BASE_TAR) -C $$(ROOTFS_DIR); \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		tar -xJf $$(ROOTFS_BASE_TAR) -C $$(ROOTFS_DIR); \' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo '	else \' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo '		echo "[CACHE MISS] Base image not found - full build required"; \' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo '		$$(MAKE) base-image; \' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo '		mkdir -p $$(ROOTFS_DIR); \' >> $(WSL_BUILD_DIR)/Makefile.native
-	@echo '		tar -xzf $$(ROOTFS_BASE_TAR) -C $$(ROOTFS_DIR); \' >> $(WSL_BUILD_DIR)/Makefile.native
+	@echo '		tar -xJf $$(ROOTFS_BASE_TAR) -C $$(ROOTFS_DIR); \' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo '	fi' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo '	@export ROOTFS_DIR="$$(ROOTFS_DIR)" ROOTFS_TAR="$$(ROOTFS_TAR)" BASE_ONLY=0 && bash ./build_rootfs.sh' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo 'base-image:' >> $(WSL_BUILD_DIR)/Makefile.native
@@ -307,9 +307,9 @@ rootfs-native-internal:
 	@# Copy results back and update cache
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Copying results back to project..."
 	@mkdir -p $(BUILD_DIR)
-	@cp -f $(WSL_BUILD_DIR)/build/rootfs.tar.gz $(ROOTFS_TAR)
-	@if [ -f "$(WSL_BUILD_DIR)/build/rootfs_base.tar.gz" ]; then \
-		cp -f $(WSL_BUILD_DIR)/build/rootfs_base.tar.gz $(ROOTFS_BASE_TAR); \
+	@cp -f $(WSL_BUILD_DIR)/build/rootfs.tar.xz $(ROOTFS_TAR)
+	@if [ -f "$(WSL_BUILD_DIR)/build/rootfs_base.tar.xz" ]; then \
+		cp -f $(WSL_BUILD_DIR)/build/rootfs_base.tar.xz $(ROOTFS_BASE_TAR); \
 		cp -f $(WSL_BUILD_DIR)/build/.rootfs_base_hash $(ROOTFS_BASE_HASH) 2>/dev/null || true; \
 		echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Base cache updated"; \
 	fi
@@ -368,13 +368,13 @@ rootfs-build-internal:
 		done; \
 		rm -rf $(ROOTFS_DIR)/*; \
 	fi
-	@tar -xzf $(ROOTFS_BASE_TAR) -C $(ROOTFS_DIR)
+	@tar -xJf $(ROOTFS_BASE_TAR) -C $(ROOTFS_DIR)
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Applying overlays..."
 	@$(MAKE) apply-overlays
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Creating final tarball..."
 	@# Remove qemu-arm-static before packaging
 	@rm -f $(ROOTFS_DIR)/usr/bin/qemu-arm-static
-	@tar -czf $(ROOTFS_TAR) -C $(ROOTFS_DIR) .
+	@tar -cJf $(ROOTFS_TAR) -C $(ROOTFS_DIR) .
 	@echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Rootfs tarball created: $(ROOTFS_TAR)"
 	@size=$$(du -h $(ROOTFS_TAR) | cut -f1); \
 	echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Size: $$size"
@@ -541,7 +541,7 @@ check-rebuild:
 	@needs_rebuild=0; \
 	needs_base=0; \
 	if [ ! -f "$(ROOTFS_TAR)" ]; then \
-		echo -e "$(YELLOW)Rebuild needed: rootfs.tar.gz does not exist$(NC)"; \
+		echo -e "$(YELLOW)Rebuild needed: rootfs.tar.xz does not exist$(NC)"; \
 		needs_rebuild=1; \
 	fi; \
 	if [ ! -f "$(ROOTFS_BASE_TAR)" ]; then \
@@ -601,3 +601,37 @@ clean-base:
 # Clean everything including base cache
 clean-all: clean clean-base
 	@echo -e "$(GREEN)All rootfs artifacts cleaned$(NC)"
+
+# Extract rootfs tarball to directory (for use in SD image creation)
+extract-rootfs:
+	@if [ ! -f "$(ROOTFS_TAR)" ]; then \
+		echo -e "$(RED)ERROR: Rootfs tarball not found: $(ROOTFS_TAR)$(NC)"; \
+		echo "  Run 'make rootfs' first to build the rootfs"; \
+		exit 1; \
+	fi
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Extracting rootfs tarball..."
+	@mkdir -p $(ROOTFS_DIR)
+	@if [ -d "$(ROOTFS_DIR)" ] && [ "$$(ls -A $(ROOTFS_DIR) 2>/dev/null)" ]; then \
+		echo -e "$(YELLOW)Cleaning existing rootfs directory...$(NC)"; \
+		for mp in $(ROOTFS_DIR)/proc $(ROOTFS_DIR)/sys $(ROOTFS_DIR)/dev; do \
+			mountpoint -q "$$mp" 2>/dev/null && umount "$$mp" 2>/dev/null || true; \
+		done; \
+		rm -rf $(ROOTFS_DIR)/*; \
+	fi
+	@tar -xJf $(ROOTFS_TAR) -C $(ROOTFS_DIR)
+	@echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Rootfs extracted to: $(ROOTFS_DIR)"
+
+# Compress rootfs directory to tarball (after modifications)
+compress-rootfs:
+	@if [ ! -d "$(ROOTFS_DIR)" ] || [ -z "$$(ls -A $(ROOTFS_DIR) 2>/dev/null)" ]; then \
+		echo -e "$(RED)ERROR: Rootfs directory is empty or does not exist: $(ROOTFS_DIR)$(NC)"; \
+		echo "  Extract or build rootfs first"; \
+		exit 1; \
+	fi
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Compressing rootfs directory..."
+	@# Remove qemu-arm-static before packaging
+	@rm -f $(ROOTFS_DIR)/usr/bin/qemu-arm-static
+	@tar -cJf $(ROOTFS_TAR) -C $(ROOTFS_DIR) .
+	@echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Rootfs tarball created: $(ROOTFS_TAR)"
+	@size=$$(du -h $(ROOTFS_TAR) | cut -f1); \
+	echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Size: $$size"
