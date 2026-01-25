@@ -410,6 +410,15 @@ base-image: $(ROOTFS_BASE_TAR)
 	@echo -e "$(GREEN)Base image ready$(NC)"
 
 $(ROOTFS_BASE_TAR): deps-check $(BASE_SOURCES)
+	@# If running under WSL on a Windows filesystem (/mnt/*), build the base image
+	@# via the native-filesystem workflow to avoid debootstrap/tar extraction failures.
+	@if [ "$(WSL_NATIVE_BUILD)" = "1" ]; then \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | WSL detected with Windows filesystem"; \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building base image on native filesystem: $(WSL_BUILD_DIR)"; \
+		$(MAKE) rootfs-native; \
+		test -f "$(ROOTFS_BASE_TAR)" || (echo -e "$(RED)ERROR: Base tarball missing after native build: $(ROOTFS_BASE_TAR)$(NC)" && exit 1); \
+		exit 0; \
+	fi
 	@# Check if cached base is still valid
 	@current_hash=$$(md5sum $(BASE_SOURCES) 2>/dev/null | md5sum | cut -d' ' -f1); \
 	if [ -f "$(ROOTFS_BASE_TAR)" ] && [ -f "$(ROOTFS_BASE_HASH)" ]; then \
