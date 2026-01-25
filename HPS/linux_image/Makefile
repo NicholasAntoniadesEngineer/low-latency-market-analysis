@@ -344,7 +344,7 @@ linux-image:
 	@if [ "$(PARALLEL_BUILD)" = "1" ]; then \
 		echo -e "$(BLUE)[STEP 2/3]$(NC) $(TIMESTAMP) | Building kernel and rootfs in PARALLEL ($(PARALLEL_JOBS) jobs)"; \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) |   Set PARALLEL_BUILD=0 for serial builds"; \
-		$(MAKE) -j$(PARALLEL_JOBS) task-kernel task-rootfs; \
+		$(MAKE) --output-sync=target -j$(PARALLEL_JOBS) task-kernel task-rootfs; \
 	else \
 		echo -e "$(BLUE)[STEP 2/3]$(NC) $(TIMESTAMP) | Building kernel and rootfs SEQUENTIALLY"; \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) |   Set PARALLEL_BUILD=1 for parallel builds"; \

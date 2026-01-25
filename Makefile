@@ -514,7 +514,7 @@ everything:
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | PARALLEL mode: FPGA and HPS building simultaneously"; \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Set PARALLEL_EVERYTHING=0 for sequential builds"; \
 		echo ""; \
-		$(MAKE) -j2 task-fpga task-hps; \
+		$(MAKE) --output-sync=target -j2 task-fpga task-hps; \
 	else \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | SEQUENTIAL mode: Building FPGA then HPS"; \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Set PARALLEL_EVERYTHING=1 for parallel builds"; \
