@@ -348,7 +348,7 @@ timing-report:
 fpga: fpga-sof
 	$(call log_header,FPGA Post-Compile (RBF + DTB in parallel))
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Generating RBF and DTB in parallel..."
-	@$(MAKE) -j2 fpga-rbf-only fpga-dtb-only
+	@$(MAKE) --output-sync=target -j2 fpga-rbf-only fpga-dtb-only
 	$(call log_ok,FPGA build complete)
 
 fpga-qsys:
@@ -567,13 +567,13 @@ clean-hps-all:
 clean:
 	$(call log_header,Cleaning Build Artifacts (Parallel))
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Cleaning FPGA and HPS in parallel..."
-	@$(MAKE) -j2 clean-fpga clean-hps
+	@$(MAKE) --output-sync=target -j2 clean-fpga clean-hps
 	@rm -f $(TIMING_DIR)/build_times.csv
 	$(call log_ok,Clean complete)
 
 clean-all:
 	$(call log_header,Deep Clean Including Caches (Parallel))
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Deep cleaning FPGA and HPS in parallel..."
-	@$(MAKE) -j2 clean-fpga-all clean-hps-all
+	@$(MAKE) --output-sync=target -j2 clean-fpga-all clean-hps-all
 	@rm -rf $(BUILD_DIR)
 	$(call log_ok,Deep clean complete)

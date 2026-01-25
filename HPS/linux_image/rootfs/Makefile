@@ -434,7 +434,7 @@ $(ROOTFS_BASE_TAR): deps-check $(BASE_SOURCES)
 		tmp_script="$(BUILD_DIR)/.build_rootfs_base.normalized.$$$$"; \
 		trap 'rm -f "$$tmp_script"' EXIT; \
 		mkdir -p $(BUILD_DIR); \
-		tr -d '\r' < "$(BUILD_SCRIPT)" > "$$tmp_script"; \
+		tr -d '\015' < "$(BUILD_SCRIPT)" > "$$tmp_script"; \
 		chmod +x "$$tmp_script"; \
 		export ROOTFS_DIR="$(ROOTFS_DIR)"; \
 		export ROOTFS_TAR="$(ROOTFS_BASE_TAR)"; \
@@ -468,7 +468,7 @@ apply-overlays:
 		for f in $(CURDIR)/configs/network/*; do \
 			if [ -f "$$f" ]; then \
 				mkdir -p $(ROOTFS_DIR)/etc/network; \
-				tr -d '\r' < "$$f" > $(ROOTFS_DIR)/etc/network/$$(basename "$$f"); \
+				tr -d '\015' < "$$f" > $(ROOTFS_DIR)/etc/network/$$(basename "$$f"); \
 			fi; \
 		done; \
 		echo "  Applied network configuration"; \
@@ -478,7 +478,7 @@ apply-overlays:
 		for f in $(CURDIR)/configs/ssh/*; do \
 			if [ -f "$$f" ]; then \
 				mkdir -p $(ROOTFS_DIR)/etc/ssh; \
-				tr -d '\r' < "$$f" > $(ROOTFS_DIR)/etc/ssh/$$(basename "$$f"); \
+				tr -d '\015' < "$$f" > $(ROOTFS_DIR)/etc/ssh/$$(basename "$$f"); \
 			fi; \
 		done; \
 		echo "  Applied SSH configuration"; \
@@ -489,7 +489,7 @@ apply-overlays:
 			if [ -f "$$script" ]; then \
 				scriptname=$$(basename "$$script"); \
 				echo "  Running $$scriptname..."; \
-				tr -d '\r' < "$$script" > $(ROOTFS_DIR)/tmp/$$scriptname; \
+				tr -d '\015' < "$$script" > $(ROOTFS_DIR)/tmp/$$scriptname; \
 				chmod +x $(ROOTFS_DIR)/tmp/$$scriptname; \
 				chroot $(ROOTFS_DIR) /bin/bash /tmp/$$scriptname 2>/dev/null || true; \
 				rm -f $(ROOTFS_DIR)/tmp/$$scriptname; \
@@ -528,7 +528,7 @@ deps:
 	@set -e; \
 		tmp_check="../scripts/.check_internet.normalized.$$$$"; \
 		trap 'rm -f "$$tmp_check"' EXIT; \
-		tr -d '\r' < "../scripts/check_internet.sh" > "$$tmp_check"; \
+		tr -d '\015' < "../scripts/check_internet.sh" > "$$tmp_check"; \
 		chmod +x "$$tmp_check"; \
 		"$$tmp_check" --name "apt repositories (build-host dependencies)" --url "https://deb.debian.org" --url "https://security.debian.org"
 	@if [ "$$(id -u)" -ne 0 ]; then \

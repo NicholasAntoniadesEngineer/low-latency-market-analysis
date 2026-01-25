@@ -360,7 +360,7 @@ soceds-find:
 	@set -e; \
 		tmp_script="./scripts/.find_soceds.normalized.$$$$"; \
 		trap 'rm -f "$$tmp_script"' EXIT; \
-		tr -d '\r' < "./scripts/find_soceds.sh" > "$$tmp_script" 2>/dev/null || cat "./scripts/find_soceds.sh" > "$$tmp_script"; \
+		tr -d '\015' < "./scripts/find_soceds.sh" > "$$tmp_script" 2>/dev/null || cat "./scripts/find_soceds.sh" > "$$tmp_script"; \
 		chmod +x "$$tmp_script"; \
 		bash "$$tmp_script" || { \
 			$(ECHO) "ERROR: Could not find SoC EDS installation."; \
@@ -798,7 +798,7 @@ QSYS_CHECK_SCRIPT := qsys_check.sh
 $(QSYS_STAMP): $(QSYS_DEPS) $(QSYS_CHECK_SCRIPT)
 	@set -e; \
 	tmp_script="$(QSYS_DIR)/.qsys_check_normalized.$$$$"; \
-	tr -d '\r' < "$(QSYS_CHECK_SCRIPT)" > "$$tmp_script"; \
+	tr -d '\015' < "$(QSYS_CHECK_SCRIPT)" > "$$tmp_script"; \
 	chmod +x "$$tmp_script"; \
 	bash "$$tmp_script" "$(QSYS_FILE)" "$(QSYS_DIR)" "$(GENERATED_DIR)" "$(QSYS_BASE)" "$(QSYS_STAMP)" "$(QSYS_SOPCINFO)" "$(QSYS_GENERATE_CMD)"; \
 	rm -f "$$tmp_script"

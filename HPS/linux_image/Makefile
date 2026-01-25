@@ -107,7 +107,7 @@ deps:
 	@set -e; \
 		tmp_check="$(SCRIPTS_DIR)/.check_internet.normalized.$$$$"; \
 		trap 'rm -f "$$tmp_check"' EXIT; \
-		tr -d '\r' < "$(SCRIPTS_DIR)/check_internet.sh" > "$$tmp_check"; \
+		tr -d '\015' < "$(SCRIPTS_DIR)/check_internet.sh" > "$$tmp_check"; \
 		chmod +x "$$tmp_check"; \
 		"$$tmp_check" --name "apt repositories (build-host dependencies)" --url "https://deb.debian.org" --url "https://security.debian.org"
 	@if [ "$(shell id -u)" -ne 0 ]; then \
@@ -290,7 +290,7 @@ kernel-internal:
 		set -e; \
 		tmp_check="$(SCRIPTS_DIR)/.check_internet.normalized.$$$$"; \
 		trap 'rm -f "$$tmp_check"' EXIT; \
-		tr -d '\r' < "$(SCRIPTS_DIR)/check_internet.sh" > "$$tmp_check"; \
+		tr -d '\015' < "$(SCRIPTS_DIR)/check_internet.sh" > "$$tmp_check"; \
 		chmod +x "$$tmp_check"; \
 		"$$tmp_check" --name "kernel sources (git)" --url "https://github.com" --url "https://raw.githubusercontent.com"; \
 		$(MAKE) -C $(KERNEL_DIR) CROSS_COMPILE=$(CROSS_COMPILE) ARCH=$(ARCH); \
@@ -305,7 +305,7 @@ rootfs-internal:
 		set -e; \
 		tmp_check="$(SCRIPTS_DIR)/.check_internet.normalized.$$$$"; \
 		trap 'rm -f "$$tmp_check"' EXIT; \
-		tr -d '\r' < "$(SCRIPTS_DIR)/check_internet.sh" > "$$tmp_check"; \
+		tr -d '\015' < "$(SCRIPTS_DIR)/check_internet.sh" > "$$tmp_check"; \
 		chmod +x "$$tmp_check"; \
 		"$$tmp_check" --name "Debian mirrors (debootstrap/apt)" --url "https://deb.debian.org" --url "https://security.debian.org"; \
 		if [ "$$(id -u)" -eq 0 ]; then \

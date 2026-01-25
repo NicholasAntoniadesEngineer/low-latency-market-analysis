@@ -223,7 +223,7 @@ $(KERNEL_DIR)/.git/config:
 	@set -e; \
 		tmp_check="../scripts/.check_internet.normalized.$$$$"; \
 		trap 'rm -f "$$tmp_check"' EXIT; \
-		tr -d '\r' < "../scripts/check_internet.sh" > "$$tmp_check"; \
+		tr -d '\015' < "../scripts/check_internet.sh" > "$$tmp_check"; \
 		chmod +x "$$tmp_check"; \
 		"$$tmp_check" --name "kernel sources (git)" --url "https://github.com" --url "https://raw.githubusercontent.com"
 	@if [ -d "$(KERNEL_DIR)" ] && [ -d "$(KERNEL_DIR)/.git" ]; then \
