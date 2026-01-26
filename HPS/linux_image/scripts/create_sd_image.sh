@@ -30,13 +30,33 @@ KERNEL_DIR="${KERNEL_DIR:-$LINUX_IMAGE_DIR/kernel}"
 ROOTFS_DIR="${ROOTFS_DIR:-$LINUX_IMAGE_DIR/rootfs}"
 
 # File locations
-PRELOADER_BIN="${PRELOADER_BIN:-$HPS_DIR/preloader/preloader-mkpimage.bin}"
-UBOOT_IMG="${UBOOT_IMG:-$HPS_DIR/preloader/uboot-socfpga/u-boot.img}"
+# Modern U-Boot (2020+) builds combined SPL+U-Boot as u-boot-with-spl.sfp
+# Legacy Intel SoC EDS builds separate preloader-mkpimage.bin and u-boot.img
+BOOTLOADER_BUILD_DIR="${LINUX_IMAGE_DIR}/bootloader/build"
+PRELOADER_BIN="${PRELOADER_BIN:-$BOOTLOADER_BUILD_DIR/u-boot-with-spl.sfp}"
+UBOOT_IMG="${UBOOT_IMG:-$BOOTLOADER_BUILD_DIR/u-boot.img}"
+# Fallback to legacy paths if modern paths don't exist
+if [ ! -f "$PRELOADER_BIN" ] && [ -f "$HPS_DIR/preloader/preloader-mkpimage.bin" ]; then
+    PRELOADER_BIN="$HPS_DIR/preloader/preloader-mkpimage.bin"
+fi
+if [ ! -f "$UBOOT_IMG" ] && [ -f "$HPS_DIR/preloader/uboot-socfpga/u-boot.img" ]; then
+    UBOOT_IMG="$HPS_DIR/preloader/uboot-socfpga/u-boot.img"
+fi
 KERNEL_IMAGE="${KERNEL_IMAGE:-$KERNEL_DIR/build/arch/arm/boot/zImage}"
 KERNEL_DTB="${KERNEL_DTB:-$KERNEL_DIR/build/arch/arm/boot/dts/socfpga_cyclone5_de10_nano.dtb}"
 FPGA_DTB="${FPGA_DTB:-$FPGA_DIR/generated/soc_system.dtb}"
 FPGA_RBF="${FPGA_RBF:-}"
-ROOTFS_TAR="${ROOTFS_TAR:-$ROOTFS_DIR/build/rootfs.tar.xz}"
+# Rootfs tarball - check multiple locations
+# Priority: 1) Environment variable 2) WSL native build dir 3) Local build dir
+if [ -z "$ROOTFS_TAR" ]; then
+    if [ -n "$WSL_BUILD_DIR" ] && [ -f "$WSL_BUILD_DIR/build/rootfs.tar.xz" ]; then
+        ROOTFS_TAR="$WSL_BUILD_DIR/build/rootfs.tar.xz"
+    elif [ -f "/var/lib/rootfs-build/build/rootfs.tar.xz" ]; then
+        ROOTFS_TAR="/var/lib/rootfs-build/build/rootfs.tar.xz"
+    else
+        ROOTFS_TAR="$ROOTFS_DIR/build/rootfs.tar.xz"
+    fi
+fi
 
 # ============================================================================
 # Device Tree Strategy (Option A: QSys-Generated)
@@ -216,22 +236,31 @@ check_files() {
     resolve_fpga_dtb || true
     resolve_fpga_rbf || true
     
-    # Check preloader
+    # Check preloader/bootloader
     if [ -f "$PRELOADER_BIN" ]; then
-        echo "✓ Preloader found: $PRELOADER_BIN ($(du -h "$PRELOADER_BIN" | cut -f1))"
+        echo "✓ Bootloader found: $PRELOADER_BIN ($(du -h "$PRELOADER_BIN" | cut -f1))"
+        # Check if using combined SPL+U-Boot format (modern U-Boot)
+        if [[ "$PRELOADER_BIN" == *"u-boot-with-spl.sfp"* ]]; then
+            echo "  Using modern U-Boot with integrated SPL"
+            UBOOT_COMBINED=1
+        else
+            UBOOT_COMBINED=0
+        fi
     else
-        print_error "Preloader not found: $PRELOADER_BIN"
-        print_error "Build preloader first: cd FPGA && make preloader"
+        print_error "Bootloader not found: $PRELOADER_BIN"
+        print_error "Build bootloader first: cd HPS/linux_image && make bootloader"
         missing=1
     fi
-    
-    # Check U-Boot
-    if [ -f "$UBOOT_IMG" ]; then
-        echo "✓ U-Boot found: $UBOOT_IMG ($(du -h "$UBOOT_IMG" | cut -f1))"
-    else
-        print_error "U-Boot not found: $UBOOT_IMG"
-        print_error "Build U-Boot first: cd FPGA && make uboot"
-        missing=1
+
+    # Check U-Boot (only needed for legacy separate preloader setup)
+    if [ "${UBOOT_COMBINED:-0}" != "1" ]; then
+        if [ -f "$UBOOT_IMG" ]; then
+            echo "✓ U-Boot found: $UBOOT_IMG ($(du -h "$UBOOT_IMG" | cut -f1))"
+        else
+            print_error "U-Boot not found: $UBOOT_IMG"
+            print_error "Build U-Boot first: cd HPS/linux_image && make bootloader"
+            missing=1
+        fi
     fi
     
     # Check kernel image (required)

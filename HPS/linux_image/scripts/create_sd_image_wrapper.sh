@@ -42,8 +42,28 @@ log_header() {
 # Script directory and paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-PRELOADER_PATH="$REPO_ROOT/preloader/preloader-mkpimage.bin"
-UBOOT_PATH="$REPO_ROOT/preloader/uboot-socfpga/u-boot.img"
+
+# Default bootloader paths - prefer modern U-Boot build, fall back to legacy
+# Environment variables can override these defaults
+BOOTLOADER_BUILD_DIR="$SCRIPT_DIR/bootloader/build"
+if [ -z "$PRELOADER_BIN" ]; then
+    if [ -f "$BOOTLOADER_BUILD_DIR/u-boot-with-spl.sfp" ]; then
+        PRELOADER_PATH="$BOOTLOADER_BUILD_DIR/u-boot-with-spl.sfp"
+    else
+        PRELOADER_PATH="$REPO_ROOT/preloader/preloader-mkpimage.bin"
+    fi
+else
+    PRELOADER_PATH="$PRELOADER_BIN"
+fi
+if [ -z "$UBOOT_IMG" ]; then
+    if [ -f "$BOOTLOADER_BUILD_DIR/u-boot.img" ]; then
+        UBOOT_PATH="$BOOTLOADER_BUILD_DIR/u-boot.img"
+    else
+        UBOOT_PATH="$REPO_ROOT/preloader/uboot-socfpga/u-boot.img"
+    fi
+else
+    UBOOT_PATH="$UBOOT_IMG"
+fi
 
 # Use normalized script if provided by Makefile, otherwise use original
 if [ -n "$NORMALIZED_MAIN_SCRIPT" ] && [ -f "$NORMALIZED_MAIN_SCRIPT" ]; then

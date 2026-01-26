@@ -19,9 +19,15 @@ FPGA_DIR := $(REPO_ROOT)/FPGA
 # Configuration
 KERNEL_DIR := $(LINUX_IMAGE_DIR)/kernel
 ROOTFS_DIR := $(LINUX_IMAGE_DIR)/rootfs
+BOOTLOADER_DIR := $(LINUX_IMAGE_DIR)/bootloader
 SCRIPTS_DIR := $(LINUX_IMAGE_DIR)/scripts
 BUILD_DIR := $(LINUX_IMAGE_DIR)/build
 DEPS_PACKAGES := debootstrap qemu-user-static debian-archive-keyring ca-certificates gnupg wget curl parted dosfstools e2fsprogs util-linux u-boot-tools
+
+# Bootloader paths (U-Boot with built-in DE10-Nano support)
+UBOOT_BUILD_DIR := $(BOOTLOADER_DIR)/build
+PRELOADER_BIN := $(UBOOT_BUILD_DIR)/u-boot-with-spl.sfp
+UBOOT_IMG := $(UBOOT_BUILD_DIR)/u-boot.img
 
 # FPGA project files (override if you use a different design)
 FPGA_QUARTUS_QPF ?= quartus/DE10_NANO_SoC_GHRD.qpf
@@ -52,7 +58,7 @@ NC ?= \033[0m
 # Timestamp for logging
 TIMESTAMP = $(shell date '+%Y-%m-%d %H:%M:%S')
 
-.PHONY: all help deps deps-check fpga kernel rootfs linux-image sd-image clean
+.PHONY: all help deps deps-check fpga kernel rootfs bootloader linux-image sd-image clean
 .PHONY: task-kernel task-rootfs parallel-build serial-build timing-report
 
 all: linux-image
@@ -69,11 +75,11 @@ help:
 	@echo "  all           - Build complete Linux image (kernel + rootfs + SD image)"
 	@echo "  deps          - Install build-host dependencies (Debian/Ubuntu/WSL)"
 	@echo "  deps-check    - Verify build-host dependencies are installed"
-	@echo "  fpga          - Build FPGA artifacts needed for SD image (preloader, U-Boot, DTB, RBF)"
+	@echo "  bootloader    - Build U-Boot bootloader (SPL + U-Boot)"
 	@echo "  kernel        - Build Linux kernel only"
 	@echo "  rootfs        - Build root filesystem only (requires root)"
-	@echo "  linux-image   - Build complete Linux image (FPGA + kernel + rootfs + SD image)"
-	@echo "  sd-image      - Create SD card image only (requires kernel and rootfs)"
+	@echo "  linux-image   - Build complete Linux image (bootloader + kernel + rootfs + SD image)"
+	@echo "  sd-image      - Create SD card image only (requires bootloader, kernel and rootfs)"
 	@echo "  sd-image-update - Update existing SD image (faster, only changed files)"
 	@echo "  clean         - Clean all build artifacts"
 	@echo "  timing-report - Show build timing statistics"
@@ -233,6 +239,15 @@ kernel:
 	@echo -e "$(GREEN)===========================================$(NC)"
 	@echo -e "$(YELLOW)Building Linux kernel...$(NC)"
 	@$(MAKE) kernel-internal
+
+# Public bootloader target - builds U-Boot with SPL (no SoC EDS required)
+bootloader:
+	@echo -e "$(GREEN)===========================================$(NC)"
+	@echo -e "$(GREEN)U-Boot Bootloader Build$(NC)"
+	@echo -e "$(GREEN)===========================================$(NC)"
+	@echo -e "$(YELLOW)Building U-Boot with SPL for DE10-Nano...$(NC)"
+	@$(MAKE) -C $(BOOTLOADER_DIR) CROSS_COMPILE=$(CROSS_COMPILE)
+	@echo -e "$(GREEN)[OK]$(NC) Bootloader built: $(PRELOADER_BIN)"
 
 # Public rootfs target (standalone use)
 rootfs:
@@ -395,16 +410,26 @@ timing-report:
 	@echo ""
 
 # Public sd-image target - checks dependencies then creates image
-sd-image: fpga
+sd-image:
+	@# Check/build bootloader
+	@if [ ! -f "$(PRELOADER_BIN)" ]; then \
+		echo -e "$(YELLOW)Bootloader not found, building...$(NC)"; \
+		$(MAKE) bootloader; \
+	else \
+		echo -e "$(GREEN)[OK] Bootloader already built$(NC)"; \
+	fi
+	@# Check/build kernel
 	@if [ ! -f "$(KERNEL_DIR)/build/arch/arm/boot/zImage" ]; then \
 		echo -e "$(YELLOW)Kernel not found, building...$(NC)"; \
 		$(MAKE) kernel; \
 	else \
 		echo -e "$(GREEN)[OK] Kernel already built$(NC)"; \
 	fi
+	@# Check/build rootfs
 	@echo -e "$(YELLOW)Checking rootfs (incremental build)...$(NC)"
 	@$(MAKE) rootfs
-	@$(MAKE) sd-image-internal
+	@# Create SD image with our bootloader paths
+	@PRELOADER_BIN="$(PRELOADER_BIN)" UBOOT_IMG="$(UBOOT_IMG)" $(MAKE) sd-image-internal
 
 # Internal SD image creation (called by linux-image and sd-image)
 sd-image-internal:

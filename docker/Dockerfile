@@ -53,6 +53,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     debootstrap \
     qemu-user-static \
     binfmt-support \
+    # SD card image creation tools
+    parted \
+    dosfstools \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
