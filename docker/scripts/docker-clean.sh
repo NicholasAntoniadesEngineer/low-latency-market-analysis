@@ -11,13 +11,15 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 # Check for --all flag
 if [ "$1" = "--all" ] || [ "$1" = "-a" ]; then
     echo "Running deep clean (removes kernel source)..."
-    exec ./docker-make.sh clean-all
+    exec "$SCRIPT_DIR/docker-make.sh" clean-all
 else
     echo "Running clean (keeps kernel source)..."
     echo "Use './docker-clean.sh --all' for deep clean"
     echo ""
-    exec ./docker-make.sh clean
+    exec "$SCRIPT_DIR/docker-make.sh" clean
 fi
