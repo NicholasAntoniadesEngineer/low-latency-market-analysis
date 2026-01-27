@@ -1,5 +1,10 @@
 # DE10-Nano SoC GHRD FPGA Project
 
+> **Note:** This is a standalone example showing the traditional Intel SoC EDS workflow.
+> The main project build system (in the repo root) uses U-Boot with built-in DE10-Nano
+> support and does NOT require SoC EDS. See the main [README.md](../../../../README.md)
+> for the recommended build process.
+
 Hardware Reference Design for the DE10-Nano SoC board with custom calculator IP core.
 
 ## Quick Start

@@ -58,7 +58,7 @@ The system architecture showing the interconnection between the FPGA and HPS (Ha
 
 - **[Complete Deployment Guide](documentation/deployment_guide.md)** - Step-by-step build and troubleshooting
 - **[FPGA-HPS Communication](documentation/hps_fpga_communication.md)** - Hardware interface details
-- **[SoC EDS Setup](FPGA/SOC_EDS_SETUP.md)** - Intel SoC EDS configuration
+- **[Docker Build Environment](docker/README.md)** - Automated build system for FPGA + HPS
 
 ## References
 

@@ -178,24 +178,6 @@ HPS/linux_image/bootloader/build/arch/arm/*
 HPS/linux_image/bootloader/build/arch/arm/dts/*
 !HPS/linux_image/bootloader/build/arch/arm/dts/socfpga_cyclone5_de10_nano.dtb
 
-# Legacy Intel SoC EDS Preloader (preloader/)
-HPS/preloader/spl_bsp/
-HPS/preloader/uboot-socfpga/build/
-HPS/preloader/uboot-socfpga/.config
-HPS/preloader/uboot-socfpga/.config.old
-HPS/preloader/uboot-socfpga/System.map
-HPS/preloader/uboot-socfpga/u-boot
-HPS/preloader/uboot-socfpga/u-boot.bin
-HPS/preloader/uboot-socfpga/u-boot.srec
-HPS/preloader/uboot-socfpga/u-boot.map
-HPS/preloader/uboot-socfpga/*.o
-HPS/preloader/uboot-socfpga/*.d
-HPS/preloader/uboot-socfpga/*.log
-
-# Keep final bootloader binaries (needed for boot)
-!HPS/preloader/preloader-mkpimage.bin
-!HPS/preloader/uboot-socfpga/u-boot.img
-
 # Application build artifacts (intermediate)
 HPS/applications/**/build/
 HPS/applications/**/*.o

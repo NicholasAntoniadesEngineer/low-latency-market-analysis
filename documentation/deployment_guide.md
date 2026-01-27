@@ -62,12 +62,10 @@ make sd-image      # SD image (requires FPGA artifacts)
 ### Software
 - **Linux environment** (WSL2 recommended for Windows)
 - **Intel Quartus Prime Lite 20.1**
-- **Intel SoC EDS 20.1** (optional, use prebuilt bootloaders)
 - **ARM cross-compiler**: `gcc-arm-linux-gnueabihf`
 - **SSH client**
 
 ### Known Issues
-- **SoC EDS 20.1**: Python XML bugs → Use prebuilt bootloader binaries
 - **CRLF line endings**: Build system auto-normalizes scripts
 
 ### Setup
@@ -383,27 +381,12 @@ ls /dev/uio* /dev/fpga*
 | Issue | Quick Fix |
 |-------|-----------|
 | **CRLF errors** | Build system auto-normalizes; use Linux editors |
-| **SoC EDS fails** | Use prebuilt bootloaders (recommended) |
 | **Quartus not found** | `export PATH="$PATH:/mnt/c/intelFPGA/20.1/quartus/bin"` |
 | **Build deps missing** | `make deps` |
 | **SD card issues** | Check `lsblk`, try different card |
 | **No network** | `sudo dhclient eth0` |
 | **FPGA not loaded** | Check `/sys/class/fpga_manager/fpga0/state` |
 | **Tests fail** | Ensure bridges enabled, run as root |
-
-### SoC EDS Workarounds
-
-**For SoC EDS 20.1 Python XML bugs:**
-```bash
-# Get prebuilt binaries from Terasic System CD
-cp preloader-mkpimage.bin HPS/preloader/
-cp u-boot.img HPS/preloader/uboot-socfpga/
-
-# Build with prebuilts
-sudo PRELOADER_BIN=HPS/preloader/preloader-mkpimage.bin \
-     UBOOT_IMG=HPS/preloader/uboot-socfpga/u-boot.img \
-     make sd-image
-```
 
 ### Recovery Commands
 
@@ -449,6 +432,5 @@ make sd-image  # Only checks for FPGA artifacts, doesn't rebuild
 ```
 
 ### Known Limitations
-- **SoC EDS 20.1**: Use prebuilt bootloaders (recommended workaround)
 - **WSL on /mnt/c/**: Slower and may have tar issues (use native fs when possible)
 - **First build**: No cache benefits, subsequent builds much faster

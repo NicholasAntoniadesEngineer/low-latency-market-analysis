@@ -207,29 +207,21 @@ fpga:
 	@bash -lc '\
 		set -e; \
 		missing=0; \
-		preloader="$${PRELOADER_BIN:-$(HPS_DIR)/preloader/preloader-mkpimage.bin}"; \
-		uboot="$${UBOOT_IMG:-$(HPS_DIR)/preloader/uboot-socfpga/u-boot.img}"; \
-		if [ ! -f "$$preloader" ]; then echo "ERROR: Preloader not found: $$preloader"; missing=1; fi; \
-		if [ ! -f "$$uboot" ]; then echo "ERROR: U-Boot not found: $$uboot"; missing=1; fi; \
-		if ! ls "$(FPGA_DIR)/generated/"*.dtb >/dev/null 2>&1; then echo "WARNING: No DTB found under: $(FPGA_DIR)/generated/ (kernel DTB may be used instead)"; fi; \
+		preloader="$(PRELOADER_BIN)"; \
+		uboot="$(UBOOT_IMG)"; \
+		if [ ! -f "$$preloader" ]; then echo "ERROR: Bootloader not found: $$preloader"; echo "Build with: make bootloader"; missing=1; fi; \
+		if [ ! -f "$$uboot" ]; then echo "ERROR: U-Boot not found: $$uboot"; echo "Build with: make bootloader"; missing=1; fi; \
+		if ! ls "$(FPGA_DIR)/generated/"*.dtb >/dev/null 2>&1; then echo "WARNING: No DTB found under: $(FPGA_DIR)/generated/ (U-Boot DTB will be used)"; fi; \
 		if ! ls "$(FPGA_DIR)/build/output_files/"*.rbf >/dev/null 2>&1 && ! ls "$(REPO_ROOT)/build/output_files/"*.rbf >/dev/null 2>&1; then \
 			echo "ERROR: No RBF found under: $(FPGA_DIR)/build/output_files/ or $(REPO_ROOT)/build/output_files/"; \
 			missing=1; \
 		fi; \
 		if [ $$missing -ne 0 ]; then \
 			echo ""; \
-			echo "FPGA artifacts are missing; SD image creation cannot proceed."; \
-			echo "Common causes:"; \
-			echo "  - Quartus not installed/in PATH (needed for RBF)"; \
-			echo "  - SoC EDS not installed or SOCEDS_DEST_ROOT not set (needed for preloader/U-Boot)"; \
-			echo ""; \
-			echo "Try:"; \
-			echo "  cd FPGA && make check-tools"; \
-			echo "  # If SoC EDS is installed: export SOCEDS_DEST_ROOT=..."; \
-			echo "  cd FPGA && make preloader uboot rbf"; \
-			echo ""; \
-			echo "Or provide prebuilt bootloader binaries:"; \
-			echo "  PRELOADER_BIN=/path/to/preloader-mkpimage.bin UBOOT_IMG=/path/to/u-boot.img sudo make sd-image"; \
+			echo "Build artifacts missing. Run:"; \
+			echo "  make bootloader   # Build U-Boot bootloader"; \
+			echo "  make kernel       # Build Linux kernel"; \
+			echo "  make rootfs       # Build root filesystem"; \
 			exit 1; \
 		fi; \
 		echo "FPGA artifacts verified"; \

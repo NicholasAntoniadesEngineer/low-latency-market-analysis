@@ -97,7 +97,7 @@ mkdir -p "$generatedOutputDir"
 	if [ -f "$generatedSynthesisDir/$QSYS_BASE.qip" ]; then
 		echo "Critical QIP found - Quartus compilation may still work."
 	else
-		echo "ERROR: Critical files missing. Please install SoC EDS and retry."
+		echo "ERROR: Critical files missing. Ensure Quartus Prime is properly installed."
 		exit 1
 	fi
 }

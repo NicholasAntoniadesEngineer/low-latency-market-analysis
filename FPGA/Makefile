@@ -224,11 +224,6 @@ ifeq ($(HAVE_QSYS_GENERATE),1)
 HAVE_QSYS := 1
 endif
 
-#<unused>
-#ifneq ($(shell $(WHICH) quartus_pgm 2>/dev/null),)
-#HAVE_QUARTUS_PGM := 1
-#endif
-
 # Set Quartus tool variables (use detected path or default to command name)
 # This allows using Windows Quartus from WSL/MINGW64
 ifeq ($(HAVE_QUARTUS),1)

@@ -45,34 +45,7 @@ FPGA_SOPCINFO := $(FPGA_DIR)/generated/soc_system.sopcinfo
 FPGA_SOF := $(FPGA_DIR)/build/output_files/DE10_NANO_SoC_GHRD.sof
 FPGA_RBF := $(FPGA_DIR)/build/output_files/DE10_NANO_SoC_GHRD.rbf
 
-# Device Tree (Option A: QSys-generated DTB)
-# ============================================================================
-# DTB Strategy: Option A - QSys-Generated Device Tree
-# ============================================================================
-# The DTB is generated from the QSys .sopcinfo file using sopc2dts.
-# This ensures the device tree accurately describes the FPGA hardware
-# configuration (peripherals, memory maps, interrupts).
-#
-# When FPGA QSys design changes:
-#   1. QSys generates new .sopcinfo
-#   2. sopc2dts generates new .dts from .sopcinfo
-#   3. dtc compiles .dts to .dtb
-#   4. SD image includes the new .dtb
-#
-# Alternative: Option B - Kernel DTB with Device Tree Overlays
-# ----------------------------------------------------------------------------
-# If you prefer to use the kernel's built-in DTB with runtime overlays:
-#   1. Set DTB_SOURCE=kernel below
-#   2. Kernel builds generic socfpga_cyclone5_de10_nano.dtb
-#   3. Create overlay files (.dtbo) for custom FPGA peripherals
-#   4. Load overlays at runtime: dtoverlay <overlay.dtbo>
-#
-# To switch to Option B:
-#   DTB_SOURCE := kernel
-#   FPGA_DTB := $(HPS_DIR)/linux_image/kernel/build/arch/arm/boot/dts/socfpga_cyclone5_de10_nano.dtb
-# ============================================================================
-# Using U-Boot generated DTB since SoC EDS tools are not configured
-DTB_SOURCE := uboot
+# Device Tree (built by U-Boot for DE10-Nano)
 FPGA_DTB := $(HPS_DIR)/linux_image/bootloader/build/arch/arm/dts/socfpga_cyclone5_de10_nano.dtb
 
 # Bootloaders (built by U-Boot with DE10-Nano support)

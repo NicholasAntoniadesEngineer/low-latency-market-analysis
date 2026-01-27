@@ -67,13 +67,11 @@ echo "This may take several minutes..."
 "$QSYS_GENERATE_CMD" "$QSYS_FILE" --synthesis=VERILOG --output-directory="$GENERATED_DIR/$QSYS_BASE" || {
 	echo ""
 	echo "WARNING: QSys generation completed with errors (this may be non-critical)."
-	echo "HPS SDRAM generation errors are common if SoC EDS is not installed."
 	echo "Checking if critical files were generated..."
 	if [ -f "$QSYS_SOPCINFO" ] && [ -f "$GENERATED_DIR/$QSYS_BASE/synthesis/$QSYS_BASE.qip" ]; then
 		echo "Critical files found - Quartus compilation may still work."
-		echo "Try compiling in Quartus. If it fails, install SoC EDS."
 	else
-		echo "ERROR: Critical files missing. Please install SoC EDS and retry."
+		echo "ERROR: Critical files missing. Ensure Quartus Prime is properly installed."
 		exit 1
 	fi
 }

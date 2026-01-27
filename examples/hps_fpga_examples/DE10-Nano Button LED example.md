@@ -1,5 +1,10 @@
 # DE10-Nano Button-LED Project
 
+> **Note:** This tutorial demonstrates the traditional Intel SoC EDS workflow for educational
+> purposes. The main project build system uses U-Boot with built-in DE10-Nano support and
+> does NOT require SoC EDS. See the main [README.md](../../README.md) for the recommended
+> build process.
+
 This document provides a complete guide to create an FPGA design, kernel module, and application for the DE10-Nano board using Quartus Lite. The Hard Processor System (HPS) runs Linux, detects a button press (KEY0), and drives an LED (LED0) via the FPGA. The project, named DE10_nano_button_led, includes proper SDRAM initialization for the HPS to boot Linux, ensuring successful HDL generation and compilation.
 
 ## FPGA Code
