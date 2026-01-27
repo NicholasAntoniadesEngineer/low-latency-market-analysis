@@ -349,7 +349,7 @@ timing-report:
 fpga: fpga-sof
 	$(call log_header,FPGA Post-Compile (RBF + DTB in parallel))
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Generating RBF and DTB in parallel..."
-	@$(MAKE) --output-sync=target -j2 fpga-rbf-only fpga-dtb-only
+	@$(MAKE) -j2 fpga-rbf-only fpga-dtb-only
 	$(call log_ok,FPGA build complete)
 
 fpga-qsys:
@@ -526,7 +526,7 @@ everything:
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | PARALLEL mode: FPGA and HPS building simultaneously"; \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Set PARALLEL_EVERYTHING=0 for sequential builds"; \
 		echo ""; \
-		$(MAKE) --output-sync=target -j2 task-fpga task-hps; \
+		$(MAKE) -j2 task-fpga task-hps; \
 	else \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | SEQUENTIAL mode: Building FPGA then HPS"; \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Set PARALLEL_EVERYTHING=1 for parallel builds"; \
@@ -579,13 +579,13 @@ clean-hps-all:
 clean:
 	$(call log_header,Cleaning Build Artifacts (Parallel))
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Cleaning FPGA and HPS in parallel..."
-	@$(MAKE) --output-sync=target -j2 clean-fpga clean-hps
+	@$(MAKE) -j2 clean-fpga clean-hps
 	@rm -f $(TIMING_DIR)/build_times.csv
 	$(call log_ok,Clean complete)
 
 clean-all:
 	$(call log_header,Deep Clean Including Caches (Parallel))
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Deep cleaning FPGA and HPS in parallel..."
-	@$(MAKE) --output-sync=target -j2 clean-fpga-all clean-hps-all
+	@$(MAKE) -j2 clean-fpga-all clean-hps-all
 	@rm -rf $(BUILD_DIR)
 	$(call log_ok,Deep clean complete)

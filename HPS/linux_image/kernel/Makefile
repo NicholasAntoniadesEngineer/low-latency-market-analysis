@@ -370,7 +370,7 @@ $(KERNEL_BUILD_DIR)/.config: kernel-download
 	if [ "$(USE_CCACHE)" = "1" ] && command -v ccache >/dev/null 2>&1; then \
 		CCACHE_CMD="ccache "; \
 	fi; \
-	make O=$(abspath $(KERNEL_BUILD_DIR)) ARCH=$(ARCH) CROSS_COMPILE="$${CCACHE_CMD}$(CROSS_COMPILE_BASE)" $$DEFCONFIG || \
+	$(MAKE) O=$(abspath $(KERNEL_BUILD_DIR)) ARCH=$(ARCH) CROSS_COMPILE="$${CCACHE_CMD}$(CROSS_COMPILE_BASE)" $$DEFCONFIG || \
 	(echo -e "$(RED)ERROR: Failed to configure kernel with $$DEFCONFIG$(NC)" && exit 1)
 	@if [ -f "$(KERNEL_BUILD_DIR)/.config" ]; then \
 		echo -e "$(GREEN)Kernel configuration complete$(NC)"; \
@@ -449,7 +449,7 @@ kernel-build: ccache-check kernel-config kernel-integrate-driver
 		CCACHE_CMD="ccache "; \
 	fi; \
 	cd $(KERNEL_DIR) && \
-	make O=$(abspath $(KERNEL_BUILD_DIR)) ARCH=$(ARCH) CROSS_COMPILE="$${CCACHE_CMD}$(CROSS_COMPILE_BASE)" \
+	$(MAKE) O=$(abspath $(KERNEL_BUILD_DIR)) ARCH=$(ARCH) CROSS_COMPILE="$${CCACHE_CMD}$(CROSS_COMPILE_BASE)" \
 		zImage modules -j$$(nproc 2>/dev/null || echo 4); \
 	echo -e "$(YELLOW)Note: DTB generation skipped (not required for current build)$(NC)"; \
 	echo -e "$(GREEN)Kernel build complete$(NC)"; \

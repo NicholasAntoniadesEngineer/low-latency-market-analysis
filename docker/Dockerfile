@@ -80,6 +80,20 @@ RUN cd /tmp && \
     dpkg -i debian-archive-keyring_2023.3+deb12u2_all.deb && \
     rm -f debian-archive-keyring_2023.3+deb12u2_all.deb
 
+# Install newer debootstrap (Stretch's 1.0.89 is too old for modern releases)
+# Extract full debootstrap 1.0.142 which supports Debian 12 (bookworm) and 13 (trixie)
+# We extract manually to avoid dependency issues on old Stretch base
+RUN cd /tmp && \
+    wget -q http://ftp.debian.org/debian/pool/main/d/debootstrap/debootstrap_1.0.142_all.deb && \
+    dpkg-deb -x debootstrap_1.0.142_all.deb debootstrap-new && \
+    rm -rf /usr/share/debootstrap && \
+    cp -r debootstrap-new/usr/share/debootstrap /usr/share/debootstrap && \
+    cp debootstrap-new/usr/sbin/debootstrap /usr/sbin/debootstrap && \
+    chmod +x /usr/sbin/debootstrap && \
+    rm -rf debootstrap-new debootstrap_1.0.142_all.deb && \
+    echo "Updated debootstrap, checking available suites:" && \
+    ls /usr/share/debootstrap/scripts/ | grep -E 'bookworm|trixie|bullseye' | head -5
+
 # Set up environment variables
 ENV CROSS_COMPILE=arm-linux-gnueabihf-
 ENV ARCH=arm

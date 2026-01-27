@@ -142,10 +142,13 @@ HPS/linux_image/kernel/build/arch/arm/*
 HPS/linux_image/kernel/build/arch/arm/boot/*
 !HPS/linux_image/kernel/build/arch/arm/boot/zImage
 
-# Rootfs build directory (all ignored - too large for git, regenerate from source)
-HPS/linux_image/rootfs/build/
+# Rootfs build directory (ignore extracted rootfs, keep tarball via LFS)
+HPS/linux_image/rootfs/build/*
+!HPS/linux_image/rootfs/build/rootfs.tar.xz
+!HPS/linux_image/rootfs/build/rootfs.tar.gz
 
-# SD card image (ignored - 4GB, regenerate from source)
+# SD card image directory (ignored - 4GB exceeds GitHub LFS 2GB limit)
+# Regenerate with: make sd-image
 HPS/linux_image/build/
 
 # ============================================================================

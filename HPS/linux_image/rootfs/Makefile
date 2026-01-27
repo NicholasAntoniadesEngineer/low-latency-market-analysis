@@ -6,25 +6,31 @@
 #   - Incremental builds (only rebuilds when source files change)
 #   - Base image caching (dramatically speeds up repeated builds)
 #   - Layered architecture (base system + overlays)
-#   - WSL native filesystem building (avoids tar failures on /mnt/c/)
+#   - Docker volume building (macOS/WSL compatibility, avoids device node issues)
 # ============================================================================
 
 SHELL := /bin/bash
 
 # ============================================================================
-# WSL Native Filesystem Building
+# Docker Volume Building (for macOS/WSL compatibility)
 # ============================================================================
-# WSL has known issues with debootstrap/tar on Windows filesystems (/mnt/c/).
-# This feature automatically builds in native Linux filesystem for reliability.
+# macOS bind mounts and WSL Windows filesystems (/mnt/c/) don't support device
+# node creation, which breaks debootstrap. This feature automatically builds in
+# a Docker internal volume instead, where all operations are supported.
+#
+# IMPORTANT: Everything builds INSIDE the Docker container. This just switches
+# between two storage locations, both inside Docker:
+#   - Bind mount: /workspace (shared with host, limited functionality)
+#   - Docker volume: /var/lib/rootfs-build (internal, full functionality)
 #
 # Detection:
 #   - Checks if running on WSL AND path starts with /mnt/
-#   - If so, builds in WSL_BUILD_DIR (default: ~/de10-rootfs-build)
+#   - If so, builds in WSL_BUILD_DIR (Docker volume, not host)
 #
 # Configuration:
-#   WSL_NATIVE_BUILD=1   : Force native filesystem build
-#   WSL_NATIVE_BUILD=0   : Disable (build in current directory)
-#   WSL_BUILD_DIR=path   : Custom native build directory
+#   WSL_NATIVE_BUILD=1   : Use Docker volume for building (required for macOS)
+#   WSL_NATIVE_BUILD=0   : Use bind mount (may fail on macOS/Windows)
+#   WSL_BUILD_DIR=path   : Docker volume path (inside container)
 # ============================================================================
 
 # Detect WSL and Windows filesystem
@@ -42,7 +48,7 @@ else
 WSL_NATIVE_BUILD ?= 0
 endif
 
-# Native build directory (in WSL's native filesystem)
+# Docker volume build directory (inside container, not host filesystem)
 WSL_BUILD_DIR ?= $(HOME)/de10-rootfs-build
 
 # Configuration
@@ -119,8 +125,8 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  all           - Build rootfs if needed (default, automatic dependency tracking)"
-	@echo "  rootfs        - Build rootfs tarball (auto-detects WSL, incremental builds)"
-	@echo "  rootfs-native - Force build on native Linux filesystem (WSL)"
+	@echo "  rootfs        - Build rootfs tarball (auto-detects macOS, incremental builds)"
+	@echo "  rootfs-native - Force build in Docker volume (required for macOS)"
 	@echo "  rootfs-local  - Force build in current directory (no WSL redirect)"
 	@echo "  base-image    - Build/cache base image only (debootstrap + packages)"
 	@echo "  overlay-only  - Force overlay rebuild (redundant - make rootfs handles this)"
@@ -161,14 +167,14 @@ help:
 	@echo "  SSH_ENABLED=yes|no"
 	@echo "  ROOT_PASSWORD=root"
 	@echo ""
-	@echo "WSL Configuration:"
-	@echo "  WSL_NATIVE_BUILD=1/0   - Force/disable native filesystem build"
-	@echo "  WSL_BUILD_DIR=path     - Custom native build directory"
-	@echo "  Current: WSL=$(IS_WSL), WindowsFS=$(IS_WINDOWS_FS), NativeBuild=$(WSL_NATIVE_BUILD)"
+	@echo "Docker Volume Configuration:"
+	@echo "  WSL_NATIVE_BUILD=1/0   - Use Docker volume (1) or bind mount (0)"
+	@echo "  WSL_BUILD_DIR=path     - Docker volume path (inside container)"
+	@echo "  Current: WSL=$(IS_WSL), WindowsFS=$(IS_WINDOWS_FS), DockerVolume=$(WSL_NATIVE_BUILD)"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make rootfs                    # Smart build with automatic dependency tracking"
-	@echo "  make rootfs-native             # Force native filesystem build (WSL)"
+	@echo "  make rootfs-native             # Force build in Docker volume (macOS/WSL)"
 	@echo "  make rootfs-local              # Force local build (no WSL redirect)"
 	@echo "  make overlay-only              # Force overlay rebuild (redundant - make rootfs does this)"
 	@echo "  make rebuild                   # Full rebuild from scratch (slow)"
@@ -223,31 +229,31 @@ show-cache-status:
 	fi
 
 # ============================================================================
-# WSL Status and Native Build Targets
+# WSL/Docker Status and Volume Build Targets
 # ============================================================================
 
 wsl-status:
-	@echo "WSL Detection Status"
-	@echo "===================="
+	@echo "Build Environment Status"
+	@echo "========================"
 	@echo "  IS_WSL:           $(IS_WSL)"
 	@echo "  IS_WINDOWS_FS:    $(IS_WINDOWS_FS)"
-	@echo "  WSL_NATIVE_BUILD: $(WSL_NATIVE_BUILD)"
+	@echo "  WSL_NATIVE_BUILD: $(WSL_NATIVE_BUILD) (1=Docker volume, 0=bind mount)"
 	@echo "  WSL_BUILD_DIR:    $(WSL_BUILD_DIR)"
 	@echo "  Current dir:      $(CURDIR)"
 	@echo ""
 	@if [ "$(IS_WSL)" = "1" ] && [ "$(IS_WINDOWS_FS)" = "1" ]; then \
 		echo -e "$(YELLOW)WARNING: Building on Windows filesystem (/mnt/c/)$(NC)"; \
 		echo -e "$(YELLOW)         debootstrap may fail with 'tar' errors$(NC)"; \
-		echo -e "$(GREEN)RECOMMENDED: Use 'make rootfs' (auto-redirects to native fs)$(NC)"; \
+		echo -e "$(GREEN)RECOMMENDED: Use 'make rootfs' (auto-uses Docker volume)$(NC)"; \
 	elif [ "$(IS_WSL)" = "1" ]; then \
-		echo -e "$(GREEN)Building on native Linux filesystem - optimal$(NC)"; \
+		echo -e "$(GREEN)Building on Linux filesystem - optimal$(NC)"; \
 	else \
-		echo -e "$(GREEN)Not running on WSL - native Linux$(NC)"; \
+		echo -e "$(GREEN)Building in Docker container$(NC)"; \
 	fi
 
-# Force build on native filesystem (WSL)
+# Force build in Docker volume (required for macOS/WSL)
 rootfs-native:
-	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building rootfs on native Linux filesystem"
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building rootfs in Docker volume (inside container)"
 	@$(MAKE) rootfs-native-internal
 
 rootfs-native-internal:
@@ -255,10 +261,10 @@ rootfs-native-internal:
 	@if [ "$$(id -u)" -ne 0 ]; then sudo -v 2>/dev/null || true; fi
 	@echo ""
 	@echo -e "$(CYAN)============================================================================$(NC)"
-	@echo -e "$(CYAN)NATIVE FILESYSTEM BUILD - SETUP$(NC)"
+	@echo -e "$(CYAN)DOCKER VOLUME BUILD - SETUP (INSIDE CONTAINER)$(NC)"
 	@echo -e "$(CYAN)============================================================================$(NC)"
-	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Setting up native build environment..."
-	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Native directory: $(WSL_BUILD_DIR)"
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Setting up Docker volume build environment..."
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Build directory: $(WSL_BUILD_DIR)"
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Workspace directory: $(BUILD_DIR)"
 	@echo -e "$(CYAN)============================================================================$(NC)"
 	@echo ""
@@ -270,7 +276,7 @@ rootfs-native-internal:
 	if [ -f "$(ROOTFS_BASE_TAR)" ] && [ -f "$(ROOTFS_BASE_HASH)" ]; then \
 		cached_hash=$$(cat $(ROOTFS_BASE_HASH)); \
 		if [ "$$current_hash" = "$$cached_hash" ]; then \
-			echo -e "$(GREEN)[CACHE HIT]$(NC) Base image is valid - copying to native filesystem"; \
+			echo -e "$(GREEN)[CACHE HIT]$(NC) Base image is valid - copying to Docker volume"; \
 			mkdir -p $$(dirname $$WSL_BASE_TAR); \
 			cp -f $(ROOTFS_BASE_TAR) $$WSL_BASE_TAR; \
 			cp -f $(ROOTFS_BASE_HASH) $$WSL_BASE_HASH; \
@@ -280,8 +286,8 @@ rootfs-native-internal:
 	else \
 		echo -e "$(YELLOW)[CACHE MISS]$(NC) No base cache found - will build from scratch"; \
 	fi
-	@# Copy necessary files to native filesystem
-	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Copying build files..."
+	@# Copy necessary files to Docker volume
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Copying build files to Docker volume..."
 	@cp -f $(BUILD_SCRIPT) $(WSL_BUILD_DIR)/
 	@cp -f $(CURDIR)/packages.txt $(WSL_BUILD_DIR)/ 2>/dev/null || true
 	@cp -rf $(CURDIR)/configs $(WSL_BUILD_DIR)/ 2>/dev/null || true
@@ -321,13 +327,13 @@ rootfs-native-internal:
 	@echo '		echo "Building Base Image (this takes 15-20 min)..."; \' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo '		export ROOTFS_DIR="$$(BUILD_DIR)/rootfs" ROOTFS_TAR="$$(ROOTFS_BASE_TAR)" BASE_ONLY=1 && bash ./build_rootfs.sh; \' >> $(WSL_BUILD_DIR)/Makefile.native
 	@echo '		md5sum $$(BASE_SOURCES) 2>/dev/null | md5sum | cut -d" " -f1 > $$(ROOTFS_BASE_HASH)' >> $(WSL_BUILD_DIR)/Makefile.native
-	@# Run build on native filesystem (sudo already validated)
+	@# Run build in Docker volume (sudo already validated)
 	@echo ""
 	@echo -e "$(CYAN)============================================================================$(NC)"
-	@echo -e "$(CYAN)RUNNING BUILD IN NATIVE DOCKER VOLUME$(NC)"
+	@echo -e "$(CYAN)RUNNING BUILD IN DOCKER VOLUME (INSIDE CONTAINER)$(NC)"
 	@echo -e "$(CYAN)============================================================================$(NC)"
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Location: $(WSL_BUILD_DIR)"
-	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | This supports device node creation for debootstrap"
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Docker volumes support device node creation for debootstrap"
 	@echo -e "$(CYAN)============================================================================$(NC)"
 	@echo ""
 	@if [ "$$(id -u)" -eq 0 ]; then \
@@ -354,7 +360,7 @@ rootfs-native-internal:
 	@echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Final rootfs: $$(du -h $(ROOTFS_TAR) | cut -f1)"
 	@echo ""
 	@echo -e "$(GREEN)============================================================================$(NC)"
-	@echo -e "$(GREEN)NATIVE BUILD COMPLETE - ARTIFACTS READY$(NC)"
+	@echo -e "$(GREEN)BUILD COMPLETE - ARTIFACTS READY (INSIDE DOCKER)$(NC)"
 	@echo -e "$(GREEN)============================================================================$(NC)"
 	@echo -e "$(GREEN)Base:  $(ROOTFS_BASE_TAR)$(NC)"
 	@echo -e "$(GREEN)Final: $(ROOTFS_TAR)$(NC)"
@@ -383,8 +389,8 @@ rootfs: $(ROOTFS_TAR)
 		sudo -v; \
 	fi; \
 	if [ "$(WSL_NATIVE_BUILD)" = "1" ]; then \
-		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | WSL detected with Windows filesystem"; \
-		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Redirecting build to native filesystem: $(WSL_BUILD_DIR)"; \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | macOS filesystem detected (bind mount)"; \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building in Docker volume: $(WSL_BUILD_DIR)"; \
 		$(MAKE) rootfs-native; \
 	else \
 		$(MAKE) rootfs-local-internal; \
@@ -406,8 +412,8 @@ $(ROOTFS_TAR): deps-check $(ROOTFS_BASE_TAR) $(OVERLAY_SOURCES)
 		sudo -v; \
 	fi; \
 	if [ "$(WSL_NATIVE_BUILD)" = "1" ]; then \
-		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | WSL detected with Windows filesystem"; \
-		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Redirecting build to native filesystem: $(WSL_BUILD_DIR)"; \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | macOS filesystem detected (bind mount)"; \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building in Docker volume: $(WSL_BUILD_DIR)"; \
 		$(MAKE) rootfs-native; \
 	else \
 		$(MAKE) rootfs-build-internal; \
@@ -449,60 +455,58 @@ base-image: $(ROOTFS_BASE_TAR)
 	@echo -e "$(GREEN)Base image ready$(NC)"
 
 $(ROOTFS_BASE_TAR): deps-check $(BASE_SOURCES)
-	@# If running under WSL on a Windows filesystem (/mnt/*), build the base image
-	@# via the native-filesystem workflow to avoid debootstrap/tar extraction failures.
+	@# If on macOS/WSL with bind mount, build in Docker volume instead
+	@# to avoid debootstrap/tar failures (bind mounts don't support device nodes).
 	@if [ "$(WSL_NATIVE_BUILD)" = "1" ]; then \
 		echo ""; \
 		echo -e "$(YELLOW)============================================================================$(NC)"; \
-		echo -e "$(YELLOW)NATIVE FILESYSTEM BUILD REQUIRED$(NC)"; \
+		echo -e "$(YELLOW)DOCKER VOLUME BUILD (INSIDE CONTAINER)$(NC)"; \
 		echo -e "$(YELLOW)============================================================================$(NC)"; \
-		echo -e "$(YELLOW)Docker bind mounts (macOS) don't support device nodes needed by debootstrap$(NC)"; \
-		echo -e "$(YELLOW)Building in native Docker volume instead: $(WSL_BUILD_DIR)$(NC)"; \
+		echo -e "$(YELLOW)macOS bind mounts don't support device nodes needed by debootstrap$(NC)"; \
+		echo -e "$(YELLOW)Using Docker internal volume: $(WSL_BUILD_DIR)$(NC)"; \
+		echo -e "$(YELLOW)Everything builds inside the Docker container$(NC)"; \
 		echo -e "$(YELLOW)This is automatic and transparent - no action needed$(NC)"; \
 		echo -e "$(YELLOW)============================================================================$(NC)"; \
 		echo ""; \
 		$(MAKE) rootfs-native; \
 		if [ ! -f "$(ROOTFS_BASE_TAR)" ]; then \
 			echo -e "$(RED)============================================================================$(NC)"; \
-			echo -e "$(RED)ERROR: Native build failed to produce base tarball$(NC)"; \
+			echo -e "$(RED)ERROR: Docker volume build failed to produce base tarball$(NC)"; \
 			echo -e "$(RED)Expected: $(ROOTFS_BASE_TAR)$(NC)"; \
 			echo -e "$(RED)============================================================================$(NC)"; \
 			exit 1; \
 		fi; \
 		echo ""; \
 		echo -e "$(GREEN)============================================================================$(NC)"; \
-		echo -e "$(GREEN)NATIVE BUILD SUCCESSFUL$(NC)"; \
+		echo -e "$(GREEN)BUILD SUCCESSFUL (INSIDE DOCKER CONTAINER)$(NC)"; \
 		echo -e "$(GREEN)============================================================================$(NC)"; \
 		echo -e "$(GREEN)Base image: $(ROOTFS_BASE_TAR) ($$(du -h $(ROOTFS_BASE_TAR) | cut -f1))$(NC)"; \
-		echo -e "$(GREEN)Artifact successfully copied from native volume to workspace$(NC)"; \
+		echo -e "$(GREEN)Artifacts copied from Docker volume to workspace$(NC)"; \
 		echo -e "$(GREEN)============================================================================$(NC)"; \
 		echo ""; \
-		exit 0; \
-	fi
-	@# Check if cached base is still valid
-	@current_hash=$$(md5sum $(BASE_SOURCES) 2>/dev/null | md5sum | cut -d' ' -f1); \
-	if [ -f "$(ROOTFS_BASE_TAR)" ] && [ -f "$(ROOTFS_BASE_HASH)" ]; then \
-		cached_hash=$$(cat $(ROOTFS_BASE_HASH)); \
-		if [ "$$current_hash" = "$$cached_hash" ]; then \
-			echo -e "$(GREEN)[CACHE VALID]$(NC) Base image is up-to-date"; \
-			echo "  Skipping debootstrap (use 'make clean-base' to force rebuild)"; \
-			touch "$(ROOTFS_BASE_TAR)" 2>/dev/null || true; \
-			exit 0; \
-		else \
-			echo -e "$(YELLOW)[CACHE STALE]$(NC) packages.txt changed - rebuilding base"; \
+	else \
+		current_hash=$$(md5sum $(BASE_SOURCES) 2>/dev/null | md5sum | cut -d' ' -f1); \
+		if [ -f "$(ROOTFS_BASE_TAR)" ] && [ -f "$(ROOTFS_BASE_HASH)" ]; then \
+			cached_hash=$$(cat $(ROOTFS_BASE_HASH)); \
+			if [ "$$current_hash" = "$$cached_hash" ]; then \
+				echo -e "$(GREEN)[CACHE VALID]$(NC) Base image is up-to-date"; \
+				echo "  Skipping debootstrap (use 'make clean-base' to force rebuild)"; \
+				touch "$(ROOTFS_BASE_TAR)" 2>/dev/null || true; \
+				exit 0; \
+			else \
+				echo -e "$(YELLOW)[CACHE STALE]$(NC) packages.txt changed - rebuilding base"; \
+			fi; \
 		fi; \
-	fi
-	@echo -e "$(CYAN)===========================================$(NC)"
-	@echo -e "$(CYAN)Building Base Image (this takes 15-20 min)$(NC)"
-	@echo -e "$(CYAN)===========================================$(NC)"
-	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Running debootstrap + package installation..."
-	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | This creates the cached base image"
-	@echo ""
-	@echo -e "$(YELLOW)WARNING: This path should not run when WSL_NATIVE_BUILD=1$(NC)"
-	@echo -e "$(YELLOW)WARNING: Building in workspace - device nodes may not work$(NC)"
-	@echo ""
-	@# Run build script with BASE_ONLY mode
-	@set -e; \
+		echo -e "$(CYAN)===========================================$(NC)"; \
+		echo -e "$(CYAN)Building Base Image (this takes 15-20 min)$(NC)"; \
+		echo -e "$(CYAN)===========================================$(NC)"; \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Running debootstrap + package installation..."; \
+		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | This creates the cached base image"; \
+		echo ""; \
+		echo -e "$(YELLOW)WARNING: Building in bind mount workspace - not Docker volume$(NC)"; \
+		echo -e "$(YELLOW)WARNING: This may fail on macOS (device nodes not supported)$(NC)"; \
+		echo -e "$(YELLOW)INFO: Everything still builds inside Docker container$(NC)"; \
+		echo ""; \
 		tmp_script="$(BUILD_DIR)/.build_rootfs_base.normalized.$$$$"; \
 		trap 'rm -f "$$tmp_script"' EXIT; \
 		mkdir -p $(BUILD_DIR); \
@@ -516,10 +520,10 @@ $(ROOTFS_BASE_TAR): deps-check $(BASE_SOURCES)
 		else \
 			echo "Base image build requires root access"; \
 			sudo -E bash "$$tmp_script"; \
-		fi
-	@# Save hash of sources used to build this base
-	@md5sum $(BASE_SOURCES) 2>/dev/null | md5sum | cut -d' ' -f1 > $(ROOTFS_BASE_HASH)
-	@echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Base image cached: $(ROOTFS_BASE_TAR)"
+		fi; \
+		md5sum $(BASE_SOURCES) 2>/dev/null | md5sum | cut -d' ' -f1 > $(ROOTFS_BASE_HASH); \
+		echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Base image cached: $(ROOTFS_BASE_TAR)"; \
+	fi
 	@echo -e "$(GREEN)[OK]$(NC) $(TIMESTAMP) | Future builds will be much faster"
 
 # Apply overlays (configs, scripts) - fast operation

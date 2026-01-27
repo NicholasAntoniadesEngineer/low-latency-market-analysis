@@ -37,8 +37,8 @@ TIMESTAMP = $(shell date '+%Y-%m-%d %H:%M:%S')
 all:
 	@if [ "$(PARALLEL_APPS)" = "1" ]; then \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building applications in PARALLEL (using all cores)"; \
-		$(MAKE) --output-sync=target -j calculator_test boot_led led_examples 2>/dev/null || \
-		$(MAKE) --output-sync=target calculator_test boot_led; \
+		$(MAKE)  -j calculator_test boot_led led_examples 2>/dev/null || \
+		$(MAKE)  calculator_test boot_led; \
 	else \
 		echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building applications SEQUENTIALLY"; \
 		$(MAKE) calculator_test; \
@@ -51,8 +51,8 @@ all:
 # Force parallel build
 all-parallel:
 	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Building all applications in parallel (using all cores)"
-	@$(MAKE) --output-sync=target -j calculator_test boot_led led_examples 2>/dev/null || \
-		$(MAKE) --output-sync=target calculator_test boot_led
+	@$(MAKE)  -j calculator_test boot_led led_examples 2>/dev/null || \
+		$(MAKE)  calculator_test boot_led
 
 # Force sequential build
 all-sequential:
