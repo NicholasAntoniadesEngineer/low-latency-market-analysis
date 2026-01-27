@@ -71,12 +71,13 @@ FPGA_RBF := $(FPGA_DIR)/build/output_files/DE10_NANO_SoC_GHRD.rbf
 #   DTB_SOURCE := kernel
 #   FPGA_DTB := $(HPS_DIR)/linux_image/kernel/build/arch/arm/boot/dts/socfpga_cyclone5_de10_nano.dtb
 # ============================================================================
-DTB_SOURCE := qsys
-FPGA_DTB := $(FPGA_DIR)/generated/soc_system.dtb
+# Using U-Boot generated DTB since SoC EDS tools are not configured
+DTB_SOURCE := uboot
+FPGA_DTB := $(HPS_DIR)/linux_image/bootloader/build/arch/arm/dts/socfpga_cyclone5_de10_nano.dtb
 
-# Bootloaders (prebuilt due to SoC EDS issues)
-PRELOADER_BIN := $(HPS_DIR)/preloader/preloader-mkpimage.bin
-UBOOT_IMG := $(HPS_DIR)/preloader/uboot-socfpga/u-boot.img
+# Bootloaders (built by U-Boot with DE10-Nano support)
+PRELOADER_BIN := $(HPS_DIR)/linux_image/bootloader/build/u-boot-with-spl.sfp
+UBOOT_IMG := $(HPS_DIR)/linux_image/bootloader/build/u-boot.img
 
 # HPS Artifacts
 KERNEL_ZIMAGE := $(HPS_DIR)/linux_image/kernel/build/arch/arm/boot/zImage
@@ -371,8 +372,17 @@ fpga-rbf-only:
 
 # DTB generation (called from fpga target, runs in parallel with RBF)
 fpga-dtb-only:
+ifeq ($(DTB_SOURCE),uboot)
+	@echo -e "$(CYAN)[INFO]$(NC) $(TIMESTAMP) | Using U-Boot generated DTB (skipping QSys DTB generation)"
+	@if [ ! -f "$(FPGA_DTB)" ]; then \
+		echo -e "$(RED)[ERROR]$(NC) DTB file not found: $(FPGA_DTB)"; \
+		exit 1; \
+	fi
+	$(call log_ok,DTB verified: $(FPGA_DTB))
+else
 	@$(MAKE) -C $(FPGA_DIR) dtb
 	$(call log_ok,DTB created: $(FPGA_DTB))
+endif
 
 # Standalone targets (for manual use)
 fpga-rbf: fpga-sof
@@ -458,7 +468,9 @@ sd-image: fpga
 		PARALLEL_BUILD=$(PARALLEL_BUILD) \
 		PARALLEL_JOBS=$(PARALLEL_JOBS) \
 		CROSS_COMPILE=$(CROSS_COMPILE) \
-		ARCH=$(ARCH)
+		ARCH=$(ARCH) \
+		PRELOADER_BIN=$(PRELOADER_BIN) \
+		UBOOT_IMG=$(UBOOT_IMG)
 	$(call end_timer,sd-image-total)
 	$(call log_ok,SD image created: $(SD_IMAGE))
 

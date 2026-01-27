@@ -2,7 +2,7 @@
 
 Fully automated build system for DE10-Nano FPGA + HPS development. Runs on **Apple Silicon Macs** via Rosetta 2.
 
-## Fresh Setup (2 Steps)
+## Fresh Setup 
 
 ### Step 1: Prerequisites (5 minutes)
 
@@ -12,10 +12,6 @@ Fully automated build system for DE10-Nano FPGA + HPS development. Runs on **App
    - Docker Desktop → Settings → Features in development
    - Enable **"Use Rosetta for x86/amd64 emulation"**
    - Apply & Restart
-
-3. **Allocate Resources**:
-   - Docker Desktop → Settings → Resources
-   - CPUs: **14** | Memory: **16GB** | Disk: **50GB+**
 
 ### Step 2: Build Everything (~60 min first time)
 
@@ -28,7 +24,9 @@ cd docker
 # Build complete system (FPGA + Linux + Apps)
 ./scripts/docker-build.sh
 
-# Done! SD card image ready in: ../output/
+# Done! SD card image ready at:
+#   ../HPS/linux_image/build/de10-nano-custom.img
+#   ../HPS/linux_image/build/de10-nano-custom.img.sha256
 ```
 
 The build is fully automated and produces a bootable SD card image with:

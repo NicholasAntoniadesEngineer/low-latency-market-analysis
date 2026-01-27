@@ -183,14 +183,22 @@ echo -e "${GREEN}✓ Partitions written${NC}"
 echo ""
 
 # Step 6: Flash bootloader to raw area (sector 0)
-echo -e "${CYAN}[6/7] Flashing bootloader...${NC}"
+echo -e "${CYAN}[6/8] Flashing bootloader...${NC}"
 dd if="$PRELOADER_BIN" of="$IMAGE_FILE" bs=512 seek=0 conv=notrunc status=progress
 sync
 echo -e "${GREEN}✓ Bootloader flashed${NC}"
 echo ""
 
-# Step 7: Cleanup
-echo -e "${CYAN}[7/7] Cleaning up...${NC}"
+# Step 7: Generate checksum
+echo -e "${CYAN}[7/8] Generating checksum...${NC}"
+CHECKSUM_FILE="${IMAGE_FILE}.sha256"
+sha256sum "$IMAGE_FILE" > "$CHECKSUM_FILE"
+CHECKSUM=$(cut -d' ' -f1 "$CHECKSUM_FILE")
+echo -e "${GREEN}✓ Checksum created: ${CHECKSUM:0:16}...${NC}"
+echo ""
+
+# Step 8: Cleanup
+echo -e "${CYAN}[8/8] Cleaning up...${NC}"
 rm -rf "$TEMP_DIR"
 echo -e "${GREEN}✓ Cleanup complete${NC}"
 echo ""
@@ -200,6 +208,7 @@ echo -e "${GREEN}SD Card Image Created Successfully!${NC}"
 echo -e "${GREEN}===========================================${NC}"
 echo "Image file: $IMAGE_FILE"
 echo "Size: $(du -h "$IMAGE_FILE" | cut -f1)"
+echo "Checksum: $CHECKSUM_FILE"
 echo ""
 echo "To write to SD card:"
 echo "  sudo dd if=$IMAGE_FILE of=/dev/sdX bs=4M status=progress"

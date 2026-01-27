@@ -1,11 +1,11 @@
 //altiobuf_out CBX_AUTO_BLACKBOX="ALL" CBX_SINGLE_OUTPUT_FILE="ON" DEVICE_FAMILY="Cyclone V" ENABLE_BUS_HOLD="FALSE" NUMBER_OF_CHANNELS=1 OPEN_DRAIN_OUTPUT="FALSE" PSEUDO_DIFFERENTIAL_MODE="TRUE" USE_DIFFERENTIAL_MODE="TRUE" USE_OE="FALSE" USE_OUT_DYNAMIC_DELAY_CHAIN1="FALSE" USE_OUT_DYNAMIC_DELAY_CHAIN2="FALSE" USE_TERMINATION_CONTROL="FALSE" datain dataout dataout_b
-//VERSION_BEGIN 20.1 cbx_altiobuf_out 2020:11:11:17:06:45:SJ cbx_mgl 2020:11:11:17:08:38:SJ cbx_stratixiii 2020:11:11:17:06:46:SJ cbx_stratixv 2020:11:11:17:06:46:SJ  VERSION_END
+//VERSION_BEGIN 18.1 cbx_altiobuf_out 2019:04:11:16:03:27:SJ cbx_mgl 2019:04:11:18:00:57:SJ cbx_stratixiii 2019:04:11:16:03:28:SJ cbx_stratixv 2019:04:11:16:03:28:SJ  VERSION_END
 // synthesis VERILOG_INPUT_VERSION VERILOG_2001
 // altera message_off 10463
 
 
 
-// Copyright (C) 2020  Intel Corporation. All rights reserved.
+// Copyright (C) 2019  Intel Corporation. All rights reserved.
 //  Your use of Intel Corporation's design tools, logic functions 
 //  and other software and tools, and any partner logic 
 //  functions, and any output files from any of the foregoing 

@@ -25,52 +25,77 @@ incremental_db/
 *.txt.user
 
 # ============================================================================
-# Quartus Build Outputs (intermediate, but keep final RBF/SOF)
+# Quartus Build Outputs
 # ============================================================================
-# Ignore intermediate build directories, but keep final outputs
-FPGA/build/db/
-FPGA/build/incremental_db/
-FPGA/build/reports/
+# Quartus intermediate databases (not needed by later stages)
 FPGA/quartus/db/
 FPGA/quartus/incremental_db/
 FPGA/quartus/*.rpt
 FPGA/quartus/*.summary
 FPGA/quartus/*.done
+FPGA/quartus/*.txt
+FPGA/quartus/*.csv
+FPGA/quartus/hps_isw_handoff/
+FPGA/quartus/hps_sdram_p0_*
 
-# Keep final FPGA bitstreams (needed for deployment)
+# FPGA build outputs (keep .rbf for SD card, ignore others)
+FPGA/build/db/
+FPGA/build/incremental_db/
+FPGA/build/output_files/*.sof
+FPGA/build/output_files/*.sld
+FPGA/build/output_files/*.jdi
+build/output_files/*.sof
+build/output_files/*.sld
+build/output_files/*.jdi
+
+# Keep .rbf files (needed for SD card image)
 !FPGA/build/output_files/*.rbf
-!FPGA/build/output_files/*.sof
+!build/output_files/*.rbf
 
 # ============================================================================
 # QSys/Platform Designer Generated Files
 # ============================================================================
-# Keep QSys generated files (needed for DTB generation and Quartus compilation)
-# but ignore temporary generation scripts
+# Strategy: Only keep files Quartus reads (from .qip). Ignore unused metadata.
+
+# Ignore entire generated directory, then selectively keep what Quartus needs
+FPGA/generated/
+!FPGA/generated/soc_system/
+!FPGA/generated/soc_system/synthesis/
+!FPGA/generated/soc_system/synthesis/soc_system.qip
+!FPGA/generated/soc_system/synthesis/soc_system.v
+!FPGA/generated/soc_system/synthesis/*.regmap
+!FPGA/generated/soc_system/synthesis/*.debuginfo
+!FPGA/generated/soc_system/synthesis/*.svd
+!FPGA/generated/soc_system/synthesis/submodules/
+!FPGA/generated/soc_system/synthesis/submodules/*.v
+!FPGA/generated/soc_system/synthesis/submodules/*.sv
+!FPGA/generated/soc_system/synthesis/submodules/*.sdc
+!FPGA/generated/soc_system/synthesis/submodules/*.tcl
+!FPGA/generated/soc_system/synthesis/submodules/*.ppf
+
+# Ignore files Quartus doesn't need
+FPGA/generated/**/*.xml
+FPGA/generated/**/*.cmp
+FPGA/generated/**/*.hex
+FPGA/generated/**/sequencer/
+
+# Ignore duplicate in quartus/qsys/ (FPGA/generated/ is canonical)
+FPGA/quartus/qsys/*/synthesis/
+FPGA/quartus/qsys/*.sopcinfo
+
+# Temporary files
 *_generation_script*
 *.sip
 *.spd
 *.qsys_check_normalized.*
-
-# Keep QSys outputs (synthesis files, sopcinfo) - needed for rebuilding
-!FPGA/generated/**/*.qip
-!FPGA/generated/**/*.v
-!FPGA/generated/**/*.sv
-!FPGA/generated/**/*.sopcinfo
-!FPGA/generated/**/*.xml
-!FPGA/generated/**/*.svd
-!FPGA/generated/**/*.regmap
-!FPGA/generated/**/*.cmp
+*.sopcinfo.cmp
 
 # ============================================================================
 # Device Tree Files
 # ============================================================================
-# Ignore intermediate DTS files, but keep final DTB (needed for boot)
+# Device tree files are generated from .qsys or built with U-Boot
 *.dts
-FPGA/generated/*.dts
-
-# Keep final DTB file (needed for boot)
-!FPGA/generated/soc_system.dtb
-!FPGA/generated/*.dtb
+*.dtb
 
 # ============================================================================
 # Modelsim/Simulation (intermediate)
@@ -100,57 +125,52 @@ HPS/**/*.elf
 HPS/**/*.dep
 HPS/**/*.log
 
-# Build directories (intermediate), but keep final outputs
-HPS/linux_image/kernel/build/drivers/
-HPS/linux_image/kernel/build/fs/
-HPS/linux_image/kernel/build/include/
-HPS/linux_image/kernel/build/init/
-HPS/linux_image/kernel/build/ipc/
-HPS/linux_image/kernel/build/kernel/
-HPS/linux_image/kernel/build/lib/
-HPS/linux_image/kernel/build/mm/
-HPS/linux_image/kernel/build/net/
-HPS/linux_image/kernel/build/scripts/
-HPS/linux_image/kernel/build/security/
-HPS/linux_image/kernel/build/sound/
-HPS/linux_image/kernel/build/tools/
-HPS/linux_image/kernel/build/usr/
-HPS/linux_image/kernel/build/vmlinux
-HPS/linux_image/kernel/build/.config.old
-HPS/linux_image/kernel/build/System.map
-HPS/linux_image/kernel/build/.tmp_versions/
-HPS/linux_image/kernel/build/.missing-syscalls.d
-HPS/linux_image/kernel/build/modules.builtin
-HPS/linux_image/kernel/build/modules.order
+# Kernel build: ignore all intermediates (2,827 .cmd files, 1,771 .o files, etc.)
+# Only keep final zImage needed by SD card image
+HPS/linux_image/kernel/build/*
 
-# Keep final kernel binary (needed for boot)
+# Exception path to reach zImage
+!HPS/linux_image/kernel/build/arch/
+!HPS/linux_image/kernel/build/arch/arm/
+!HPS/linux_image/kernel/build/arch/arm/boot/
+
+# Ignore all arch/arm subdirectories except boot/
+HPS/linux_image/kernel/build/arch/arm/*
+!HPS/linux_image/kernel/build/arch/arm/boot/
+
+# Ignore all files in boot/, then selectively keep zImage
+HPS/linux_image/kernel/build/arch/arm/boot/*
 !HPS/linux_image/kernel/build/arch/arm/boot/zImage
-!HPS/linux_image/kernel/build/arch/arm/boot/dts/*.dtb
 
-# Rootfs build directory (intermediate), but keep final tarball
-HPS/linux_image/rootfs/build/rootfs/
-HPS/linux_image/rootfs/build/.rootfs_base_hash
+# Rootfs build directory (all ignored - too large for git, regenerate from source)
+HPS/linux_image/rootfs/build/
 
-# Keep final rootfs tarball (needed for deployment)
-# Using .tar.xz for better compression, keeping .tar.gz for backward compatibility
-!HPS/linux_image/rootfs/build/rootfs.tar.xz
-!HPS/linux_image/rootfs/build/rootfs_base.tar.xz
-!HPS/linux_image/rootfs/build/rootfs.tar.gz
-!HPS/linux_image/rootfs/build/rootfs_base.tar.gz
-
-# Keep SD card image (final deployable artifact)
-!HPS/linux_image/build/*.img
+# SD card image (ignored - 4GB, regenerate from source)
+HPS/linux_image/build/
 
 # ============================================================================
 # Bootloader Build Artifacts
 # ============================================================================
-# Modern U-Boot bootloader (linux_image/bootloader/)
+# Modern U-Boot bootloader: ignore all intermediate build artifacts
 HPS/linux_image/bootloader/u-boot-socfpga/
 HPS/linux_image/bootloader/build/*
 
 # Keep final bootloader outputs (needed for SD card creation)
 !HPS/linux_image/bootloader/build/u-boot-with-spl.sfp
 !HPS/linux_image/bootloader/build/u-boot.img
+
+# Exception path to reach DTB
+!HPS/linux_image/bootloader/build/arch/
+!HPS/linux_image/bootloader/build/arch/arm/
+!HPS/linux_image/bootloader/build/arch/arm/dts/
+
+# Ignore all arch/arm subdirectories except dts/
+HPS/linux_image/bootloader/build/arch/arm/*
+!HPS/linux_image/bootloader/build/arch/arm/dts/
+
+# Ignore all files in dts/, then selectively keep DTB
+HPS/linux_image/bootloader/build/arch/arm/dts/*
+!HPS/linux_image/bootloader/build/arch/arm/dts/socfpga_cyclone5_de10_nano.dtb
 
 # Legacy Intel SoC EDS Preloader (preloader/)
 HPS/preloader/spl_bsp/
@@ -202,6 +222,7 @@ FPGA/tgz/
 # IDE and Editor Files
 # ============================================================================
 .vscode/
+.claude/
 *.swp
 *.swo
 *~
@@ -232,89 +253,31 @@ __pycache__/
 *.pyo
 
 # ============================================================================
-# KEEP THESE FILES (Do NOT ignore) - Source Files
+# Build Artifacts Summary
 # ============================================================================
-# Source HDL files
-!FPGA/hdl/*.v
-!FPGA/hdl/*.sv
-!FPGA/hdl/*.vhd
-
-# IP Source files
-!FPGA/ip/**/*.v
-!FPGA/ip/**/*.sv
-!FPGA/ip/**/*.vhd
-!FPGA/ip/**/*.tcl
-!FPGA/ip/**/*.qip
-!FPGA/ip/**/*.md
-
-# QSys Source
-!FPGA/quartus/qsys/*.qsys
-!FPGA/quartus/qsys/*.xml
-
-# Quartus Project Files
-!FPGA/quartus/*.qpf
-!FPGA/quartus/*.qsf
-!FPGA/quartus/*.sdc
-
-# Documentation
-!documentation/**/*.md
-!*.md
-!README*
-!**/README*
-!**/README.md
-
-# Makefiles and Scripts
-!Makefile
-!**/Makefile
-!*.sh
-!*.bat
-
-# HPS Software Source
-!HPS/**/*.c
-!HPS/**/*.h
-!HPS/**/*.cpp
-!HPS/**/*.hpp
-!HPS/**/*.S
-!HPS/**/*.lds
-!HPS/**/*.dtsi
-!HPS/**/Kconfig
-!HPS/**/defconfig
-
-# Configuration Files
-!HPS/**/packages.txt
-!HPS/**/*.conf
-!HPS/**/configs/**
-!HPS/**/scripts/**
-
-# Re-ignore temporary normalized scripts under scripts/ (the rule above is overridden by !HPS/**/scripts/**)
-HPS/**/scripts/*.normalized.*
-HPS/**/scripts/.*.normalized.*
-
-# ============================================================================
-# Final Build Artifacts Summary (KEPT)
-# ============================================================================
-# The following final artifacts are KEPT and should be committed:
-# 
-# FPGA:
-#   - FPGA/build/output_files/*.rbf (FPGA bitstream)
-#   - FPGA/build/output_files/*.sof (FPGA bitstream)
-#   - FPGA/generated/soc_system.dtb (Device tree)
-#   - FPGA/generated/soc_system.sopcinfo (QSys info for DTB generation)
-#   - FPGA/generated/soc_system/synthesis/* (QSys synthesis outputs)
+# Strategy: Keep artifacts needed by later stages, ignore true intermediates
 #
-# HPS:
-#   - HPS/linux_image/bootloader/build/u-boot-with-spl.sfp (Modern U-Boot with SPL)
-#   - HPS/linux_image/bootloader/build/u-boot.img (U-Boot image)
-#   - HPS/linux_image/kernel/build/arch/arm/boot/zImage (Kernel binary)
-#   - HPS/linux_image/rootfs/build/rootfs.tar.xz (Root filesystem, xz compressed)
-#   - HPS/linux_image/rootfs/build/rootfs_base.tar.xz (Base rootfs cache)
-#   - HPS/linux_image/build/*.img (SD card image)
-#   - HPS/preloader/preloader-mkpimage.bin (Legacy preloader)
-#   - HPS/preloader/uboot-socfpga/u-boot.img (Legacy U-Boot)
-#   - HPS/applications/**/calculator_test (Application binaries)
+# TRACKED (source files):
+#   - FPGA/quartus/qsys/*.qsys (QSys system definition)
+#   - FPGA/quartus/*.qpf, *.qsf, *.sdc (Quartus project files)
+#   - FPGA/hdl/**/*.v, *.sv (HDL source files)
+#   - HPS/**/*.c, *.h (Application source code)
+#   - Makefiles, scripts, configs
 #
-# These artifacts are needed for:
-#   1. Deployment without rebuilding
-#   2. Reproducible builds
-#   3. Quick testing of changes
+# TRACKED (inter-stage artifacts, needed by later builds):
+#   - FPGA/generated/ (QSys outputs → Quartus needs for compilation)
+#   - FPGA/build/output_files/*.rbf (FPGA bitstream → SD image needs)
+#   - HPS/linux_image/bootloader/build/*.sfp, *.img, *.dtb (→ SD image)
+#   - HPS/linux_image/kernel/build/arch/arm/boot/zImage (→ SD image)
+#   - HPS/linux_image/rootfs/build/*.tar.xz (→ SD image)
+#   - HPS/linux_image/build/*.img (final SD card image)
+#
+# IGNORED (true intermediates, not needed by later stages):
+#   - FPGA/quartus/db/, incremental_db/ (Quartus compilation database)
+#   - FPGA/quartus/qsys/*/synthesis/ (duplicate of FPGA/generated/)
+#   - *.sof, *.jdi, *.sld (JTAG/debug files, not needed for SD card)
+#   - HPS kernel/bootloader .o files, build directories
+#   - HPS/linux_image/rootfs/build/rootfs/ (extracted rootfs)
+#
+# To rebuild everything: cd docker && ./scripts/docker-build.sh
 # ============================================================================
